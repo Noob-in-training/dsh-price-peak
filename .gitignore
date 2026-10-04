@@ -1,0 +1,22 @@
+# ── dsh-price-peak ────────────────────────────────────────────────────────────
+# This directory is itself the distributable repository root.
+
+# NOTE: lib/client.js IS committed on purpose, even though build.mjs generates it.
+# A clone has to be installable as-is — dsh loads the built bundle at startup, so
+# ignoring it would hand every GitHub user a plugin that fails until they discover
+# the build step. The usual "generated file drifts from source" worry is covered
+# instead by `node build.mjs --check`, which fails the suite when the artifact and
+# src/ disagree. Run `npm run verify` before committing.
+
+# Regenerable preview artifacts
+preview-ui.html
+preview-ui.png
+
+# Scratch Chrome profile used when screenshotting the preview page
+.chrome-profile/
+
+# Noise
+.DS_Store
+node_modules/
+npm-debug.log*
+*.tgz

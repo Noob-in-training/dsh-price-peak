@@ -1,0 +1,41 @@
+# ── dsh-price-peak ────────────────────────────────────────────────────────────
+# DeepSeek 峰谷价格倍率，显示在输入框上方。
+#
+# 把下面这一行加到 ~/.dsh/profiles/desktop/cordis.patch.yml 末尾，
+# 并把插件目录复制到 ~/.dsh/profiles/desktop/plugins/dsh-price-peak/。
+# 详细步骤见 install.md。
+#
+# 路径是相对 profile 目录解析的，所以插件跟着 profile 走，不依赖任何全局安装。
+# 整个 config 都可以删掉 —— 每一行的默认值都已调到可用状态。
+
+- insert:
+    - id: price-peak
+      name: './plugins/dsh-price-peak/index.js'
+      config:
+        # 是否联网刷新官方定价页。设为 false 则只用内置快照运行。
+        liveUpdate: true
+        # 刷新间隔（分钟）。价格变动以周计，6 小时足够。
+        refreshMinutes: 360
+        # 单次抓取超时（毫秒）。
+        timeoutMs: 15000
+        # 覆盖定价页地址。填了就【只】用这一个（指向镜像或固定副本时行为可预期，
+        # 失败也能看见）；留空则依次尝试官方中英文页面，中文页不可用时自动回退。
+        sourceUrl: ''
+        # 额外的法定节假日（YYYY-MM-DD），会【替换】内置的 2026 年表。
+        # 国务院公布下一年安排后，填这里即可，无需改代码。
+        holidays: []
+        # 额外的假期区间，同样替换内置表，适合整段放假：
+        # customHolidayRuns:
+        #   - { month: 1, from: 1, to: 3, name: 元旦 }
+        customHolidayRuns: []
+        # 调休上班日是否算高峰。true 遵循官方规则（只排除法定节假日），
+        # 也就是上班的周六仍然计高峰；false 则按普通周末处理。
+        treatAdjustedWorkdaysAsPeak: true
+        # 覆盖高峰倍率；0 表示采用页面上写的倍率。
+        peakMultiplier: 0
+        # 详情面板里按哪个模型计价；留空用第一行。
+        model: ''
+
+    # 宿主半区需要一个能挂路由的 HTTP 服务。桌面版与 Web 版都自带，
+    # 这里显式声明依赖，缺失时会直接报错而不是静默失败。
+    # （不需要额外加行：inject 写在插件内部，见 lib/index.js。）

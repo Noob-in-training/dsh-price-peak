@@ -1,0 +1,54 @@
+{
+  "name": "dsh-price-peak",
+  "version": "0.1.0",
+  "description": "DeepSeek peak/off-peak price multiplier in the composer dock: Beijing-time schedule, live-refreshed from the official pricing page.",
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "cordis",
+    "plugin",
+    "pricing"
+  ],
+  "license": "MIT",
+  "author": "pokmandeng",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  },
+  "files": [
+    "index.js",
+    "lib/",
+    "src/",
+    "build.mjs",
+    "preview.mjs",
+    "preview-ui.mjs",
+    "README.md",
+    "install.md",
+    "install/"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "check:build": "node build.mjs --check",
+    "test": "node --test test/core.test.mjs test/parse.test.mjs test/host.test.mjs test/client-bundle.test.mjs",
+    "preview": "node preview.mjs",
+    "preview:ui": "node preview-ui.mjs --open",
+    "verify": "npm run check:build && npm test"
+  },
+  "private": true
+}

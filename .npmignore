@@ -1,0 +1,8 @@
+# npm 包内容与仓库内容不同：仓库含测试，包不含。
+# `files`（package.json）已经在包含侧设了白名单，这里负责排除测试夹具与模板。
+test/
+install/cordis.patch.yml.bak*
+*.bak
+.chrome-profile/
+preview-ui.html
+preview-ui.png
