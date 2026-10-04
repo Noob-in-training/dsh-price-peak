@@ -72,6 +72,7 @@ function state(multiplier, clock, reason, windowLabel, nextLabel, nextIn, extra 
 		nextPeak: !peak,
 		adjustedWorkday: extra.adjustedWorkday === true,
 		model: "deepseek-flash",
+		sources: extra.sources,
 		rows: [
 			["输入·缓存命中", "0.02 / 0.04 元"],
 			["输入·缓存未命中", "1 / 2 元"],
@@ -110,6 +111,22 @@ const SCENARIOS = [
 		open: true
 	},
 	{
+		title: "来源混用 —— 价格来自快照，时段来自页面",
+		note: "价格表解析失败但页面注释解析成功。这是最危险的状态：数据看起来是当前的，实际是两个来源拼的。",
+		state: state(3, "10:24:07", "工作日高峰时段", "上午高峰", "距空闲", "1小时35分", {
+			sources: { models: "snapshot", windows: "live", multiplier: "live" }
+		}),
+		open: true
+	},
+	{
+		title: "峰谷时段退化为代码默认",
+		note: "连页面注释都没解析出来时，时段与倍率用的是代码里的默认值 —— 官方调整后不会自动跟上，界面明说这一点。",
+		state: state(2, "10:24:07", "工作日高峰时段", "上午高峰", "距空闲", "1小时35分", {
+			sources: { models: "snapshot", windows: "default", multiplier: "default" }
+		}),
+		open: true
+	},
+	{
 		title: "接口不可用 —— ×?",
 		note: "宿主路由未注册或首次轮询失败时的降级形态，面板仍然占位而不是闪没。",
 		state: { failed: true },
@@ -123,6 +140,24 @@ const esc = (text) => String(text)
 	.replace(/</g, "&lt;")
 	.replace(/>/g, "&gt;")
 	.replace(/"/g, "&quot;");
+
+/**
+ * Reproduce the component's provenance line. Kept in step with
+ * `sourceText()` in src/client.template.js: when the layers disagree the row
+ * names each field's source instead of pretending there is one.
+ */
+function sourceText(s) {
+	if (s.sources === undefined) return "官方定价页";
+	const labels = { live: "官方定价页", snapshot: "内置快照", default: "代码默认" };
+	const parts = [
+		["价格", s.sources.models],
+		["峰谷时段", s.sources.windows],
+		["倍率", s.sources.multiplier]
+	].filter(([, value]) => value !== undefined);
+	if (parts.length === 0) return "官方定价页";
+	if (new Set(parts.map(([, value]) => value)).size <= 1) return labels[parts[0][1]] ?? "—";
+	return parts.map(([label, value]) => `${label}：${labels[value] ?? value}`).join("；");
+}
 
 /** One `label: value` row. */
 function row(c, label, value, className = "") {
@@ -163,11 +198,23 @@ function renderDock(c, scenario) {
 		row(c, "单价单位", "百万tok（空闲 / 高峰，元）"),
 		`<div class="${c.head}">deepseek-flash · DeepSeek-V4.1-Flash</div>`,
 		...s.rows.map(([label, value]) => row(c, label, value)),
-		row(c, "数据来源", "官方定价页"),
+		row(c, "数据来源", sourceText(s)),
 		row(c, "上次成功更新", `${s.data.ageText}前`, s.data.stale ? c.warn : ""),
 		row(c, "刷新间隔", `${s.data.refreshMinutes} 分钟`)
 	];
 	const notices = [];
+	if (s.sources !== undefined) {
+		const assumed = [
+			s.sources.windows === "default" ? "峰谷时段" : undefined,
+			s.sources.multiplier === "default" ? "倍率" : undefined
+		].filter(Boolean);
+		if (assumed.length > 0) {
+			notices.push(`<div class="${c.rule} ${c.warn}">${esc(assumed.join("、"))}无法从页面确认，正在使用内置默认值；官方调整后这里不会自动跟上。</div>`);
+		}
+		if (s.sources.models === "snapshot") {
+			notices.push(`<div class="${c.rule} ${c.warn}">价格表来自内置快照，不是本次抓取的结果。</div>`);
+		}
+	}
 	if (s.data.lastError !== undefined) {
 		notices.push(`<div class="${c.rule} ${c.err}">抓取失败：${esc(s.data.lastError)}</div>`);
 	}

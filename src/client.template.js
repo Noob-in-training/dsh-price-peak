@@ -95,6 +95,7 @@ function toView(payload, error, previous) {
 		peakMultiplier: pricing.peakMultiplier,
 		ruleText: pricing.ruleText,
 		sourceUrl: pricing.sourceUrl,
+		sources: pricing.sources === null || typeof pricing.sources !== "object" ? undefined : pricing.sources,
 		stale: data.stale === true,
 		live: data.live === true,
 		ageMs: data.ageMs,
@@ -259,11 +260,30 @@ function register(ctx, React) {
 			})
 		];
 
+		// Provenance, per field. A single "官方定价页" line would hide the case where
+		// prices came from the snapshot while the windows came from the page — two
+		// different sources presented as one current reading.
+		const sourceLabels = { live: "官方定价页", snapshot: "内置快照", default: "代码默认" };
+		const provenance = view.sources;
+		const sourceText = () => {
+			if (view.liveUpdateEnabled === false) return "仅内置快照（联网已关闭）";
+			if (provenance === undefined) return view.live ? "官方定价页" : "内置快照";
+			const parts = [
+				["价格", provenance.models],
+				["峰谷时段", provenance.windows],
+				["倍率", provenance.multiplier]
+			].filter(([, value]) => value !== undefined);
+			if (parts.length === 0) return view.live ? "官方定价页" : "内置快照";
+			const distinct = new Set(parts.map(([, value]) => value));
+			if (distinct.size <= 1) return sourceLabels[parts[0][1]] ?? "—";
+			return parts.map(([label, value]) => `${label}：${sourceLabels[value] ?? value}`).join("；");
+		};
+
 		const dataRows = [
 			React.createElement(Row, {
 				key: "src",
 				label: "数据来源",
-				value: view.liveUpdateEnabled === false ? "仅内置快照" : view.live ? "官方定价页" : "内置快照"
+				value: sourceText()
 			}),
 			React.createElement(Row, {
 				key: "age",
@@ -286,6 +306,22 @@ function register(ctx, React) {
 			notices.push(React.createElement("div", { className: `${c.rule} ${c.err}`, key: "fetch" }, `抓取失败：${view.lastError}`));
 		} else if (view.stale) {
 			notices.push(React.createElement("div", { className: `${c.rule} ${c.warn}`, key: "stale" }, "数据可能已过期，显示的是最后一次成功抓取的结果。"));
+		}
+		// Mixed provenance is exactly what a partial parse produces: prices from the
+		// snapshot, schedule from the page. Say it instead of presenting one source.
+		if (provenance !== undefined) {
+			const assumed = [
+				provenance.windows === "default" ? "峰谷时段" : undefined,
+				provenance.multiplier === "default" ? "倍率" : undefined
+			].filter(Boolean);
+			if (assumed.length > 0) {
+				notices.push(React.createElement("div", { className: `${c.rule} ${c.warn}`, key: "assumed" },
+					`${assumed.join("、")}无法从页面确认，正在使用内置默认值；官方调整后这里不会自动跟上。`));
+			}
+			if (provenance.models === "snapshot" && view.liveUpdateEnabled !== false) {
+				notices.push(React.createElement("div", { className: `${c.rule} ${c.warn}`, key: "prices" },
+					"价格表来自内置快照，不是本次抓取的结果。"));
+			}
 		}
 		if (view.ruleText !== undefined) {
 			notices.push(React.createElement("div", { className: c.rule, key: "rule" }, view.ruleText));

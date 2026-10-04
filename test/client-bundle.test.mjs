@@ -224,6 +224,27 @@ test("toView classifies an off-peak payload and counts down to the peak", async 
 	assert.equal(view.nextIn, "1天23小时", "a long gap reads in days, not hours");
 });
 
+test("toView carries per-field provenance through to the panel", async () => {
+	const { exports } = await loadBundle();
+	const view = exports.toView({
+		status: { peak: true, multiplier: 3, beijing: { clock: "10:00:00" }, reason: "r", msUntilTransition: 1000 },
+		// The dangerous mixture: the schedule is live, the prices are not.
+		pricing: { models: [], peakWindows: [], sources: { models: "snapshot", windows: "live", multiplier: "live" } },
+		data: { live: true, stale: false, ageMs: 0 }
+	});
+	assert.deepEqual(view.sources, { models: "snapshot", windows: "live", multiplier: "live" });
+});
+
+test("a payload without provenance still renders", async () => {
+	const { exports } = await loadBundle();
+	const view = exports.toView({
+		status: { peak: false, multiplier: 1, beijing: { clock: "10:00:00" }, reason: "r", msUntilTransition: 1000 },
+		pricing: { models: [] },
+		data: { live: false, stale: true }
+	});
+	assert.equal(view.sources, undefined, "absent provenance must not become a rendered object");
+});
+
 test("a failed poll keeps the last reading instead of blanking the panel", async () => {
 	const { exports } = await loadBundle();
 	const good = exports.toView({

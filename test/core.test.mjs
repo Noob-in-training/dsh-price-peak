@@ -19,7 +19,8 @@ import {
 	modelEntry,
 	multiplierText,
 	pricingStatus,
-	resolvePricing
+	resolvePricing,
+	SOURCE
 } from "../lib/core.js";
 
 /** A Beijing wall-clock instant, as epoch ms. Month is 1-based. */
@@ -338,6 +339,65 @@ test("resolvePricing lets user overrides beat both layers", () => {
 	const resolved = resolvePricing(live, bundled, { peakMultiplier: 1.5 });
 	assert.equal(resolved.peakMultiplier, 1.5);
 	assert.deepEqual(resolved.peakWindows, [{ startHour: 5, endHour: 6, label: "自定" }]);
+});
+
+test("resolvePricing reports which layer answered for each field", () => {
+	// A document can be live for its schedule and snapshot-only for its prices at
+	// the same time. Without provenance the panel presents that mixture as one
+	// current reading, which is how a silent wrong number reaches a user.
+	const bundled = {
+		models: PRICING.models,
+		peakWindows: PRICING.peakWindows,
+		peakMultiplier: 2
+	};
+
+	// Prices missing from the live layer, schedule present: the dangerous case.
+	const mixed = resolvePricing(
+		{ peakWindows: [{ startHour: 10, endHour: 11, label: "页面窗口" }], peakMultiplier: 3, fetchedAt: 1 },
+		bundled
+	);
+	assert.equal(mixed.sources.models, "snapshot", "prices fell back to the snapshot");
+	assert.equal(mixed.sources.windows, "live", "while the schedule came from the page");
+	assert.equal(mixed.sources.multiplier, "live");
+	assert.equal(mixed.peakMultiplier, 3, "and the page multiplier is what renders");
+
+	// Everything live.
+	const full = resolvePricing(
+		{ models: PRICING.models, peakWindows: PRICING.peakWindows, peakMultiplier: 2, fetchedAt: 1 },
+		bundled
+	);
+	assert.deepEqual(full.sources, { models: "live", windows: "live", multiplier: "live" });
+
+	// Nothing live, snapshot carries a schedule: every field is the snapshot's.
+	const snapshotWithSchedule = resolvePricing(undefined, bundled);
+	assert.deepEqual(snapshotWithSchedule.sources, {
+		models: "snapshot",
+		windows: "snapshot",
+		multiplier: "snapshot"
+	});
+
+	// The state that actually ships: the real snapshot carries prices only, so the
+	// schedule is the code's own assumption and the panel must warn about it.
+	const snapshotOnly = resolvePricing(undefined, { models: PRICING.models });
+	assert.equal(snapshotOnly.sources.models, "snapshot");
+	assert.equal(snapshotOnly.sources.windows, "default", "the shipped snapshot has no windows");
+	assert.equal(snapshotOnly.sources.multiplier, "default");
+
+	// Nothing at all.
+	assert.deepEqual(resolvePricing(undefined, undefined).sources, {
+		models: "default",
+		windows: "default",
+		multiplier: "default"
+	});
+});
+
+test("a configured override counts as authoritative, not as a fallback", () => {
+	const resolved = resolvePricing(undefined, { models: PRICING.models }, {
+		peakWindows: [{ startHour: 5, endHour: 6, label: "自定" }],
+		peakMultiplier: 1.5
+	});
+	assert.equal(resolved.sources.windows, "live", "a user-supplied window is not an assumption");
+	assert.equal(resolved.sources.multiplier, "live");
 });
 
 test("resolvePricing survives empty or malformed layers", () => {
