@@ -1,0 +1,21 @@
+dsh-price-peak
+Copyright (c) 2026 pokmandeng — MIT (see LICENSE)
+
+Third-party content
+-------------------
+
+test/fixtures/pricing-zh-cn.html
+
+    A verbatim capture of the official DeepSeek API pricing page:
+
+        https://api-docs.deepseek.com/zh-cn/quick_start/pricing/
+        captured 2026-10-04
+
+    It is included as a test fixture only, so the page extractor is tested against
+    the real markup instead of a hand-written approximation. The content is
+    DeepSeek's; this project claims no rights over it and does not redistribute it
+    as part of the published npm package (see .npmignore). The prices inside it are
+    dated by definition — the running plugin reads the live page, not this file.
+
+DeepSeek is a trademark of DeepSeek, Inc. This project is independent and is not
+affiliated with or endorsed by DeepSeek.

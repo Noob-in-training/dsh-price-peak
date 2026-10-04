@@ -1,5 +1,7 @@
 # dsh-price-peak
 
+English | [中文](README.md) — [README.en.md](README.en.md)
+
 **DeepSeek API 峰谷价格徽标** —— 在 DeepSeek Harness 的输入框上方常驻一行：当前
 价格倍率（高峰 ×2 / 空闲 ×1）、判定所依据的**北京时间**、以及距离下次切换的倒计时。
 
@@ -148,7 +150,7 @@ lib/snapshot.js           内置兜底数据
 lib/client.js             ← 构建产物（已入库），浏览器实际加载的就是它
 src/client.template.js    浏览器半区源码（ESM，可直接 node --check）
 src/client-styles.js      样式（构建时内联进 bundle）
-test/                     四个测试套件，74 项
+test/                     四个测试套件，77 项
 test/fixtures/            官方定价页的真实快照，解析器测试用
 install.md                安装步骤与排查
 install/cordis.patch.yml  带注释的配置模板

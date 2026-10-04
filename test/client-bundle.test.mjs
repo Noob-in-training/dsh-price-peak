@@ -245,6 +245,20 @@ test("a payload without provenance still renders", async () => {
 	assert.equal(view.sources, undefined, "absent provenance must not become a rendered object");
 });
 
+test("the price formatter keeps every digit and never renders nonsense", async () => {
+	const { exports } = await loadBundle();
+	// The helper used to `return String(value)` under a comment promising grouped
+	// output — an identity function with a misleading name. It formats for real now,
+	// and these are the values the official table actually produces.
+	assert.equal(exports.numberText(0.02), "0.02", "the smallest cache-hit rate survives intact");
+	assert.equal(exports.numberText(13.5), "13.5", "and a half-rate does not round");
+	assert.equal(exports.numberText(27), "27");
+	assert.equal(exports.numberText(0), "0");
+	assert.equal(exports.numberText(Number.NaN), "—");
+	assert.equal(exports.numberText(undefined), "—");
+	assert.equal(exports.numberText("4"), "—", "a string is not a price");
+});
+
 test("a failed poll keeps the last reading instead of blanking the panel", async () => {
 	const { exports } = await loadBundle();
 	const good = exports.toView({

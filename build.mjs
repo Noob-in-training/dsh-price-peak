@@ -78,6 +78,7 @@ function buildBundle() {
 		`${IND}exports.inject = inject;`,
 		`${IND}exports.register = register;`,
 		`${IND}exports.toView = toView;`,
+		`${IND}exports.numberText = numberText;`,
 		`${IND}return module.exports;`,
 		"\t}",
 		"});",

@@ -107,6 +107,39 @@ test("window edges are half-open: 09:00 in, 12:00 out, 14:00 in, 18:00 out", () 
 	assert.equal(status(bj(2026, 1, 5, 18, 0)).peak, false);
 });
 
+test("a single-window schedule is labelled by position, not by invented parts of day", () => {
+	// Labels used to come from fixed positions, so a live page carrying only a
+	// morning window labelled everything after it "夜间空闲" — calling 13:00 night.
+	const oneWindow = {
+		models: [],
+		peakWindows: [{ startHour: 9, endHour: 12, label: "上午高峰" }],
+		peakMultiplier: 2
+	};
+	assert.equal(pricingStatus(bj(2026, 1, 5, 8, 0), oneWindow).windowLabel, "高峰前空闲");
+	assert.equal(pricingStatus(bj(2026, 1, 5, 13, 0), oneWindow).windowLabel, "高峰后空闲");
+	assert.equal(pricingStatus(bj(2026, 1, 5, 20, 0), oneWindow).windowLabel, "高峰后空闲");
+	// Two windows keep the original, more specific names.
+	assert.equal(status(bj(2026, 1, 5, 7, 0)).windowLabel, "早晨空闲");
+	assert.equal(status(bj(2026, 1, 5, 13, 0)).windowLabel, "午间空闲");
+	assert.equal(status(bj(2026, 1, 5, 20, 0)).windowLabel, "夜间空闲");
+});
+
+test("holiday dates are normalized, and impossible ones are ignored", () => {
+	// `2026-1-5` is a reasonable thing to type; before this it was stored verbatim
+	// and never matched the padded key the calendar uses, so the configured holiday
+	// silently did nothing.
+	const unpadded = { holidays: ["2026-1-5"] };
+	assert.equal(status(bj(2026, 1, 5, 10, 0), unpadded).peak, false, "unpadded month and day still work");
+	assert.equal(status(bj(2026, 1, 5, 10, 0), unpadded).reason, "自定义假期");
+
+	for (const impossible of ["2026-13-01", "2026-02-30", "not-a-date", "2026-1", ""]) {
+		const calendar = buildHolidayCalendar([impossible]);
+		assert.equal(calendar.size, 0, `${impossible} must not become a key`);
+	}
+	// Whitespace is tolerated.
+	assert.equal(buildHolidayCalendar([" 2026-3-9 "]).has("2026-03-09"), true);
+});
+
 test("off-peak stretches get their own labels", () => {
 	assert.equal(status(bj(2026, 1, 5, 7, 0)).windowLabel, "早晨空闲");
 	assert.equal(status(bj(2026, 1, 5, 12, 30)).windowLabel, "午间空闲");

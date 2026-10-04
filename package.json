@@ -36,8 +36,10 @@
     "preview.mjs",
     "preview-ui.mjs",
     "README.md",
+    "README.en.md",
     "install.md",
-    "install/"
+    "install/",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=20"
@@ -51,5 +53,12 @@
     "verify": "npm run check:build && npm test",
     "probe:setup": "ln -sfn \"$HOME/.dsh/profiles/node_modules\" node_modules"
   },
-  "private": true
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Noob-in-training/dsh-price-peak.git"
+  },
+  "homepage": "https://github.com/Noob-in-training/dsh-price-peak#readme",
+  "bugs": {
+    "url": "https://github.com/Noob-in-training/dsh-price-peak/issues"
+  }
 }

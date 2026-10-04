@@ -43,10 +43,20 @@ function durationText(ms) {
 	return `${seconds}秒`;
 }
 
-/** Group an integer with thin separators; `95` -> `1.2` style stay untouched. */
+/**
+ * Format one price. Uses the viewer's locale, so `13.5` renders as `13.5` in
+ * en-US and `13,5` in de-DE without this file knowing either, and small values
+ * keep every digit they were given.
+ */
 function numberText(value) {
 	if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-	return Number.isInteger(value) ? String(value) : String(value);
+	try {
+		return value.toLocaleString();
+	} catch {
+		// `toLocaleString` cannot realistically throw, but a panel that renders a
+		// price is not the place to find out otherwise.
+		return String(value);
+	}
 }
 
 /**
