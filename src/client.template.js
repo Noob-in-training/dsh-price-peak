@@ -221,6 +221,14 @@ function register(ctx, React) {
 		const view = usePriceState();
 		const toneClass = view.tone === "peak" ? c.peak : view.tone === "off" ? c.off : c.unknown;
 		const dotClass = view.error !== undefined ? c.dotError : view.stale ? c.dotStale : c.dot;
+		// The dot is the only always-visible health signal, so its tooltip has to
+		// distinguish "the last refresh failed" from "nothing has refreshed in a
+		// while" — a failing fetch used to leave it green for 15 hours.
+		const dotTitle = view.error !== undefined
+			? `状态接口不可用：${view.error}`
+			: view.lastError !== undefined && view.lastError !== null
+				? `抓取失败，数据可能已过期：${view.lastError}`
+				: view.stale ? "数据可能已过期" : "数据已同步";
 
 		const bar = React.createElement("div", { className: c.bar },
 			React.createElement("span", { className: `${c.badge} ${toneClass}` }, view.badge),
@@ -228,7 +236,7 @@ function register(ctx, React) {
 			React.createElement("span", { className: c.reason },
 				view.ok ? `${view.reason}${view.windowLabel.length > 0 ? ` · ${view.windowLabel}` : ""}` : "价格状态不可用"),
 			view.ok ? React.createElement("span", { className: c.next }, `${view.nextLabel} ${view.nextIn}`) : null,
-			React.createElement("span", { className: dotClass, title: view.error ?? (view.stale ? "数据可能已过期" : "数据已同步") }),
+			React.createElement("span", { className: dotClass, title: dotTitle }),
 			React.createElement("button", {
 				type: "button",
 				className: c.toggle,

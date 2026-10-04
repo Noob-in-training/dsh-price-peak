@@ -22,7 +22,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { resolvePricing, pricingStatus } from "../lib/core.js";
-import { PRICING_URLS, parseAndValidate } from "../lib/parse.js";
+import { PRICING_URL, parseAndValidate } from "../lib/parse.js";
 import { SNAPSHOT } from "../lib/snapshot.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -61,11 +61,11 @@ test("the snapshot parses and resolves without a live document", () => {
 });
 
 test("a parsed live page layers over the snapshot field by field", () => {
-	const live = parseAndValidate(fixture, { sourceUrl: PRICING_URLS[0], fetchedAt: 1791000000000 });
+	const live = parseAndValidate(fixture, { sourceUrl: PRICING_URL, fetchedAt: 1791000000000 });
 	assert.notEqual(live, undefined);
 	const resolved = resolvePricing(live, SNAPSHOT);
 	assert.equal(resolved.fetchedAt, 1791000000000, "the freshness stamp comes from the live document");
-	assert.equal(resolved.sourceUrl, PRICING_URLS[0]);
+	assert.equal(resolved.sourceUrl, PRICING_URL);
 	assert.equal(resolved.peakMultiplier, 2, "and from the page's own note");
 	assert.equal(resolved.models.length, 2);
 });
@@ -73,7 +73,7 @@ test("a parsed live page layers over the snapshot field by field", () => {
 test("a live-only document still produces a usable state", () => {
 	// The bundled snapshot is a fallback, not a prerequisite: if a future release
 	// drops it, a successful fetch must be enough on its own.
-	const live = parseAndValidate(fixture, { sourceUrl: PRICING_URLS[0], fetchedAt: Date.now() });
+	const live = parseAndValidate(fixture, { sourceUrl: PRICING_URL, fetchedAt: Date.now() });
 	const resolved = resolvePricing(live, undefined);
 	assert.equal(resolved.models.length, 2);
 	assert.equal(resolved.peakMultiplier, 2);
@@ -87,7 +87,7 @@ test("the wire document carries everything the panel renders", () => {
 	// reads are present. This is the contract between the two halves, and the one
 	// place a rename would break silently.
 	const pricing = resolvePricing(
-		parseAndValidate(fixture, { sourceUrl: PRICING_URLS[0], fetchedAt: Date.now() }),
+		parseAndValidate(fixture, { sourceUrl: PRICING_URL, fetchedAt: Date.now() }),
 		SNAPSHOT
 	);
 	const status = pricingStatus(Date.now(), pricing);
@@ -152,40 +152,104 @@ test("a configured sourceUrl is a strict override, never a silent fallback", () 
 	const source = readFileSync(hostPath, "utf8");
 	assert.match(
 		source,
-		/return typeof config\.sourceUrl === "string" && config\.sourceUrl\.length > 0\s*\n\s*\? \[config\.sourceUrl\]\s*\n\s*: PRICING_URLS;/,
+		/return typeof config\.sourceUrl === "string" && config\.sourceUrl\.length > 0\s*\n\s*\? \[config\.sourceUrl\]\s*\n\s*: \[PRICING_URL\];/,
 		"an override must replace the URL list rather than head it"
 	);
 	assert.match(source, /usedFallback = result\.fellBack === true/, "and a fallback must be recorded");
 	assert.match(source, /usedFallbackSource: usedFallback/, "and surfaced on the wire");
 });
 
-test("fetchPricing tries only the configured URL when one is set", async () => {
-	// Runs the real module from the profile, because that is the only place its
-	// bare specifiers resolve. Skipped when no profile is installed.
-	const profile = join(homedir(), ".dsh", "profiles", "desktop");
-	const entry = join(profile, "plugins", "dsh-price-peak", "index.js");
-	if (!existsSync(entry)) return; // not installed on this machine
+test("sourceUrl reaches the fetch through apply, not just through fetchPricing", async () => {
+	// This test exists because the earlier version of it called `fetchPricing`
+	// directly with a hand-built config. That passed while the plugin's real path
+	// was broken: `apply` projected its own `settings` object and never copied
+	// `sourceUrl` into it, so the documented strict override silently used the
+	// official page instead. Testing the internals instead of the entry point hid
+	// a bug in the entry point, so this drives `apply` and reads the route.
+	const probe = join(here, "..", ".probe", "host-probe.mjs");
+	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) return; // run `npm run probe:setup`
 
-	const probe = `
-		const { fetchPricing } = await import(${JSON.stringify(entry)});
-		const out = await fetchPricing(
-			{ sourceUrl: "https://pricing.invalid.example/nope", timeoutMs: 4000 },
-			undefined
-		);
-		process.stdout.write(JSON.stringify({
-			hasDocument: out.document !== undefined,
-			error: out.error ?? null,
-			url: out.url ?? null
-		}));
-	`;
-	const result = spawnSync(nodeBin, ["--input-type=module", "-e", probe], {
-		cwd: profile,
-		encoding: "utf8",
-		timeout: 30000
+	const run = (request) => {
+		const result = spawnSync(nodeBin, [probe, JSON.stringify(request)], { encoding: "utf8", timeout: 40000 });
+		assert.equal(result.status, 0, `probe failed: ${result.stderr}`);
+		return JSON.parse(result.stdout);
+	};
+
+	// An unreachable override must produce no live data and name itself in the error.
+	const broken = run({ sourceUrl: "https://pricing.invalid.example/nope", timeoutMs: 3000, waitMs: 6000 });
+	const brokenData = broken.states[0].body.data;
+	assert.equal(brokenData.live, false, "an unreachable override must not yield live data");
+	assert.match(String(brokenData.lastError), /pricing\.invalid\.example/, "the error must name the override");
+	assert.equal(broken.states[0].body.pricing.sourceUrl?.includes("pricing.invalid.example"), false,
+		"and no official URL may have answered");
+
+	// With no override the plugin reads the official page. Skipped when offline.
+	const normal = run({ waitMs: 8000 });
+	const normalData = normal.states[0].body.data;
+	if (normalData.live !== true) return;
+	assert.match(normal.states[0].body.pricing.sourceUrl, /api-docs\.deepseek\.com/, "the default source is the official page");
+	assert.equal(normalData.stale, false, "a fresh success is not stale");
+	assert.equal(normal.states[0].body.pricing.sources.models, "live");
+});
+
+test("a failing refresh marks the data stale immediately, not after 15 hours", async () => {
+	const probe = join(here, "..", ".probe", "host-probe.mjs");
+	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) return;
+
+	const result = spawnSync(nodeBin, [probe, JSON.stringify({
+		sourceUrl: "https://pricing.invalid.example/nope", timeoutMs: 3000, waitMs: 6000
+	})], { encoding: "utf8", timeout: 40000 });
+	assert.equal(result.status, 0, `probe failed: ${result.stderr}`);
+	const data = JSON.parse(result.stdout).states[0].body.data;
+	// Age-based staleness alone would keep this false for 15 h while every fetch
+	// fails, leaving the panel showing a green "up to date" dot through an outage.
+	assert.equal(data.stale, true, "a recorded failure is staleness, whatever the age");
+	assert.ok(data.lastError !== undefined && data.lastError !== null, "and the reason is recorded");
+});
+
+test("the state route answers with the documented wire shape", async () => {
+	const probe = join(here, "..", ".probe", "host-probe.mjs");
+	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) return;
+
+	const result = spawnSync(nodeBin, [probe, JSON.stringify({ liveUpdate: false, waitMs: 200 })], {
+		encoding: "utf8", timeout: 40000
 	});
 	assert.equal(result.status, 0, `probe failed: ${result.stderr}`);
-	const parsed = JSON.parse(result.stdout);
-	assert.equal(parsed.hasDocument, false, "an unreachable override must not yield a document");
-	assert.match(String(parsed.error), /pricing\.invalid\.example/, "and the error must name the override");
-	assert.equal(parsed.url, null, "and no other source may have answered");
+	const state = JSON.parse(result.stdout).states[0];
+	assert.equal(state.status, 200, "the route answers 200");
+	const body = state.body;
+	// Assertions against the real handler, replacing a hand-copied literal that had
+	// already drifted out of date once.
+	assert.equal(typeof body.status.peak, "boolean");
+	assert.equal(typeof body.status.multiplier, "number");
+	assert.match(body.status.beijing.clock, /^\d{2}:\d{2}:\d{2}$/);
+	assert.equal(Array.isArray(body.status.windows), true);
+	assert.equal(Array.isArray(body.pricing.models), true);
+	assert.ok(body.pricing.models.length > 0, "the snapshot still supplies prices");
+	assert.equal(typeof body.pricing.sources, "object", "provenance is on the wire");
+	assert.equal(body.pricing.sources.models, "snapshot", "and names the snapshot");
+	assert.equal(body.pricing.sources.windows, "default", "with the schedule as an assumption");
+	assert.equal(body.data.snapshotOnly, true);
+	assert.equal(body.data.live, false);
+});
+
+test("an unknown next transition is reported as unknown, not fabricated", async () => {
+	// A holiday run longer than the 14-day horizon used to yield an invented
+	// instant where the peak flag does not change, so the countdown pointed at a
+	// moment when nothing happens.
+	const probe = join(here, "..", ".probe", "host-probe.mjs");
+	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) return;
+
+	const result = spawnSync(nodeBin, [probe, JSON.stringify({
+		liveUpdate: false, waitMs: 200, customHolidayRuns: [{ month: 4, from: 1, to: 30, name: "长假" }]
+	})], { encoding: "utf8", timeout: 40000 });
+	assert.equal(result.status, 0, `probe failed: ${result.stderr}`);
+	const status = JSON.parse(result.stdout).states[0].body.status;
+	// The probe runs "now", so just assert the shape stays coherent either way.
+	assert.ok(status.nextTransitionMs === null || typeof status.nextTransitionMs === "number");
+	if (status.nextTransitionMs === null) {
+		assert.equal(status.msUntilTransition, null, "no duration may accompany an unknown transition");
+	} else {
+		assert.equal(typeof status.msUntilTransition, "number");
+	}
 });

@@ -20,3 +20,8 @@ preview-ui.png
 node_modules/
 npm-debug.log*
 *.tgz
+
+# Symlink to the app's node_modules, created by `npm run probe:setup`.
+# Only needed to import lib/index.js directly (its schemastery import is a peer of
+# the app, not a dependency of this plugin).
+/node_modules

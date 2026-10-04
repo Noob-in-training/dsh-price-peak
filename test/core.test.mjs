@@ -164,11 +164,59 @@ test("treatAdjustedWorkdaysAsPeak:false demotes 调休 days to ordinary weekends
 	assert.equal(calendar.has("2026-02-17"), true, "statutory runs are unaffected by the switch");
 });
 
-test("a custom holiday list replaces the shipped runs", () => {
+test("an explicit holiday list replaces the shipped table wholesale", () => {
+	// `holidays` and `customHolidayRuns` are alternatives, not layers. If an
+	// explicit list merely joined the shipped table, a user entering next year's
+	// dates would silently keep this year's holidays too — and there is no way to
+	// express "only these dates".
 	const options = { holidays: ["2026-01-05"] };
-	assert.equal(status(bj(2026, 1, 5, 10, 0), options).peak, false, "custom holiday wins");
+	assert.equal(status(bj(2026, 1, 5, 10, 0), options).peak, false, "the listed date is a holiday");
 	assert.equal(status(bj(2026, 1, 5, 10, 0), options).usingShippedHolidays, false);
-	assert.equal(status(bj(2026, 2, 17, 10, 0), options).peak, true, "Spring Festival no longer applies");
+	assert.equal(status(bj(2026, 2, 17, 10, 0), options).peak, true, "Spring Festival is gone with the table");
+	// The 调休 table belongs to the shipped notice, which was just replaced, so its
+	// workdays go too. That is coherent — but it must be a consequence of replacing
+	// the table, never of adding one unrelated date.
+	assert.equal(status(bj(2026, 2, 14, 10, 0), options).reason, "周六");
+});
+
+test("adding a holiday does not quietly disable the 调休 table by accident", () => {
+	// The bug this guards: `holidays` used to return early, before the 调休 loop, so
+	// one unrelated date turned every working Saturday into off-peak. With the list
+	// semantics above, 调休 goes only when the whole shipped table goes — which is
+	// what the previous test asserts. What must not happen is the table surviving a
+	// replacement.
+	const replaced = { holidays: ["2026-12-25"] };
+	assert.equal(status(bj(2026, 12, 25, 10, 0), replaced).peak, false, "the new date applies");
+	assert.equal(status(bj(2026, 2, 17, 10, 0), replaced).peak, true, "and the shipped table is replaced");
+
+	// A custom run list behaves the same way.
+	const runs = { customHolidayRuns: [{ year: 2026, month: 12, from: 25, to: 26, name: "圣诞" }] };
+	assert.equal(status(bj(2026, 12, 25, 10, 0), runs).peak, false);
+	assert.equal(status(bj(2026, 2, 14, 10, 0), runs).peak, false, "its 调休 entry goes with the table");
+});
+
+test("a holiday run can name its own year, so next year needs no code change", () => {
+	// CALENDAR_YEAR used to key every run, so a run meant for 2027 produced 2026
+	// keys and the documented "no code change next year" path simply did not work.
+	const nextYear = { customHolidayRuns: [{ year: 2027, month: 1, from: 1, to: 3, name: "元旦" }] };
+	assert.equal(status(bj(2027, 1, 1, 10, 0), nextYear).peak, false, "2027-01-01 is a holiday");
+	assert.equal(status(bj(2027, 1, 1, 10, 0), nextYear).reason, "元旦假期");
+	assert.equal(status(bj(2027, 1, 4, 10, 0), nextYear).peak, true, "and a plain Monday is peak");
+
+	// Without a year the run lands in the shipped calendar's year, as documented.
+	const thisYear = { customHolidayRuns: [{ month: 12, from: 25, to: 26, name: "圣诞" }] };
+	assert.equal(status(bj(2026, 12, 25, 10, 0), thisYear).peak, false);
+});
+
+test("a holiday run longer than the search horizon reports no transition", () => {
+	// The 14-day horizon covers the shipped calendar. A user-configured run can
+	// exceed it, and the old fallback returned an invented instant where the peak
+	// flag does not change — a countdown to nothing.
+	const longRun = { customHolidayRuns: [{ year: 2026, month: 4, from: 1, to: 30, name: "长假" }] };
+	const s = status(bj(2026, 4, 15, 10, 0), longRun);
+	assert.equal(s.peak, false, "the whole of April is off-peak");
+	assert.equal(s.nextTransitionMs, null, "no flip inside the horizon");
+	assert.equal(s.msUntilTransition, null, "so no duration may be reported either");
 });
 
 test("custom holiday runs replace the shipped runs", () => {

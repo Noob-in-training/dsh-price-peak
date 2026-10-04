@@ -13,7 +13,7 @@
  *   node preview.mjs --fetch              refresh from the official page first
  */
 import { formatDuration, pricingStatus, resolvePricing, BEIJING_OFFSET_MS } from "./lib/core.js";
-import { PRICING_URLS, parseAndValidate } from "./lib/parse.js";
+import { PRICING_URL, parseAndValidate } from "./lib/parse.js";
 import { SNAPSHOT, SNAPSHOT_CAPTURED_AT } from "./lib/snapshot.js";
 
 /** `2026-01-05T10:30` in Beijing, as epoch ms. */
@@ -38,7 +38,7 @@ const flag = (name) => {
 /** Layer a live fetch over the snapshot when asked; otherwise run snapshot-only. */
 async function loadPricing(wantFetch) {
 	if (!wantFetch) return { pricing: resolvePricing(undefined, SNAPSHOT, {}), source: `bundled snapshot (${SNAPSHOT_CAPTURED_AT})` };
-	for (const url of PRICING_URLS) {
+	for (const url of [PRICING_URL]) {
 		try {
 			const response = await fetch(url, {
 				headers: { accept: "text/html", "user-agent": "dsh-price-peak-preview/0.1.0" },

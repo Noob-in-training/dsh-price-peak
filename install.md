@@ -37,11 +37,18 @@ cd ~/Documents/workspace/uoftwork/dsh-custom/dsh-price-peak
 ```bash
 PROFILE=~/.dsh/profiles/desktop
 SRC=~/Documents/workspace/uoftwork/dsh-custom/dsh-price-peak
+TARGET="$PROFILE/plugins/dsh-price-peak"
 
 mkdir -p "$PROFILE/plugins"
-# index.js 是包根入口，lib/ 是宿主与客户端产物，两者都要。
-cp -R "$SRC" "$PROFILE/plugins/dsh-price-peak"
+# Remove first, then copy. Plain `cp -R` onto an existing install nests the source
+# inside itself (`dsh-price-peak/src/index.js`) and leaves the old files behind, so
+# a re-install silently mixes two versions. Verify the path before deleting.
+[ -n "$TARGET" ] && [ "$TARGET" != "/" ] && rm -rf "$TARGET"
+cp -R "$SRC" "$TARGET"
 ```
+
+**升级**就是重跑这几行，然后重启 App —— 这段是幂等的。配置在
+`cordis.patch.yml` 里，不在插件目录内，所以升级不会丢设置。
 
 然后编辑 `~/.dsh/profiles/desktop/cordis.patch.yml`，在**文件末尾**追加：
 
@@ -91,7 +98,18 @@ cp -R "$SRC" "$PROFILE/plugins/dsh-price-peak"
 | `liveUpdate` | `true` | 是否联网刷新官方定价页。`false` 则只用内置快照。 |
 | `refreshMinutes` | `360` | 刷新间隔，5–10080 分钟。 |
 | `timeoutMs` | `15000` | 单次抓取超时。 |
-| `sourceUrl` | `''` | 填了则**只用**这一个地址（严格覆盖）。留空则依次尝试官方中英文页面。 |
+### 上游页面改版了怎么办
+
+`test/fixtures/pricing-zh-cn.html` 是**冻结**的页面快照，不会自己更新。上游改版后：
+
+1. 重新抓取：`curl -sS https://api-docs.deepseek.com/zh-cn/quick_start/pricing/ -o test/fixtures/pricing-zh-cn.html`
+2. 跑 `npm test` —— 解析器测试现在会按新页面判定，失败处就是需要改的提取逻辑
+3. 改 `lib/parse.js` 让测试通过，必要时更新 `lib/snapshot.js` 里的兜底价格
+
+没有 CI 会自动做这件事，所以**面板上的来源标注是最早的预警**：它变成「内置快照」
+或「代码默认」就说明解析器已经跟不上页面了。
+
+| `sourceUrl` | `''` | 填了则**只用**这一个地址（严格覆盖），失败就是失败。留空则用官方中文页。 |
 | `holidays` | `[]` | 额外法定节假日 `YYYY-MM-DD`，**替换**内置 2026 年表。 |
 | `customHolidayRuns` | `[]` | 额外假期区间 `{ month, from, to, name }`，同样替换内置表。 |
 | `treatAdjustedWorkdaysAsPeak` | `true` | 调休上班日是否算高峰。 |
@@ -153,10 +171,9 @@ rm -rf ~/.dsh/profiles/desktop/plugins/dsh-price-peak
 - **官方页面改版可能让解析失败。** 解析器读的是渲染后的表格文本而不是样式，
   所以换样式不会影响；但如果表格结构重排，`parse.js` 需要跟着更新。
   `test/parse.test.mjs` 用的是真实抓取的页面快照，一旦解析不出来就会失败——
-  这正是提醒信号。
+  **注意**：夹具是冻结的快照，不会自动感知上游改版；需要你重新抓取才会重新有效。
 - **部分解析失败会按字段降级**，界面会标明每个字段的来源；若显示「代码默认」，
   说明峰谷时段没能从页面确认，官方调整后不会自动跟上。见 README「部分解析失败时会发生什么」。
-- **定价页的英文版解析兜底较弱。** 中文页是首选；仅在 `sourceUrl` 留空时才会回退到英文页，
-  回退发生时 `data.usedFallbackSource` 为 `true`。
+- **只支持中文定价页。** 英文页标签不同，解析器返回空，所以它不是兜底来源。
 - 面板每秒轮询一次本地路由。数据量 < 4 KiB 且有测试守着，但如果你在意后台开销，
   可以把 `POLL_MS` 调大后重新 `node build.mjs`。

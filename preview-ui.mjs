@@ -18,6 +18,8 @@
  * Usage: node preview-ui.mjs [--out path] [--open]
  */
 import { readFileSync, writeFileSync } from "node:fs";
+
+import { SNAPSHOT, SNAPSHOT_CAPTURED_AT } from "./lib/snapshot.js";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -71,16 +73,32 @@ function state(multiplier, clock, reason, windowLabel, nextLabel, nextIn, extra 
 		nextIn,
 		nextPeak: !peak,
 		adjustedWorkday: extra.adjustedWorkday === true,
-		model: "deepseek-flash",
+		model: SNAPSHOT.models[0].name,
 		sources: extra.sources,
-		rows: [
-			["输入·缓存命中", "0.02 / 0.04 元"],
-			["输入·缓存未命中", "1 / 2 元"],
-			["输出", "4 / 8 元"]
-		],
+		// From the shipped snapshot, not typed here: a preview that hardcodes prices
+		// drifts from the snapshot it depicts, and "no price number appears in the
+		// logic" is a claim this repository makes.
+		rows: RATE_ROWS,
 		data: extra.data ?? { live: true, stale: false, ageText: "12分", refreshMinutes: 360 }
 	};
 }
+
+/** Rate rows for the first snapshot model, read from the snapshot itself. */
+const RATE_ROWS = (() => {
+	const model = SNAPSHOT.models[0];
+	if (model === undefined) return [];
+	return [
+		["输入·缓存命中", `${model.offPeak.cacheHit} / ${model.peak.cacheHit} 元`],
+		["输入·缓存未命中", `${model.offPeak.cacheMiss} / ${model.peak.cacheMiss} 元`],
+		["输出", `${model.offPeak.output} / ${model.peak.output} 元`]
+	];
+})();
+
+/** Model heading, also derived from the snapshot. */
+const MODEL_HEADING = (() => {
+	const model = SNAPSHOT.models[0];
+	return model === undefined ? "—" : `${model.name} · ${model.version}`;
+})();
 
 const SCENARIOS = [
 	{
@@ -196,7 +214,7 @@ function renderDock(c, scenario) {
 		row(c, `${s.nextLabel}（${s.nextPeak ? "×2" : "×1"}）`, s.nextIn),
 		row(c, "高峰时段", "09:00-12:00、14:00-18:00"),
 		row(c, "单价单位", "百万tok（空闲 / 高峰，元）"),
-		`<div class="${c.head}">deepseek-flash · DeepSeek-V4.1-Flash</div>`,
+		`<div class="${c.head}">${esc(MODEL_HEADING)}</div>`,
 		...s.rows.map(([label, value]) => row(c, label, value)),
 		row(c, "数据来源", sourceText(s)),
 		row(c, "上次成功更新", `${s.data.ageText}前`, s.data.stale ? c.warn : ""),
@@ -352,7 +370,7 @@ ${widgetCss()}
 		配色与圆角取自已安装的 <code>@deepseek-ai/dsh-client-ui-theme</code>，输入框几何值取自
 		<code>dsh-client-ui-conversation</code>（卡片 <code>min(calc(100% - 16px), 952px)</code>、
 		内缩 8px）。标记由组件真实的类名映射生成，改类名会让这里显示异常而不是悄悄失真。
-		生成时间：${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC
+		生成时间：${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC；价格取自内置快照（${SNAPSHOT_CAPTURED_AT}）
 	</p>
 	<div class="bar">
 		<button class="ctl" id="theme">切换深色 / 浅色</button>
