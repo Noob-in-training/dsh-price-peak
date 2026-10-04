@@ -83,7 +83,7 @@ lib/snapshot.js           内置兜底数据
 lib/client.js             ← 构建产物（已入库），浏览器实际加载的就是它
 src/client.template.js    浏览器半区源码（ESM，可直接 node --check）
 src/client-styles.js      样式（构建时内联进 bundle）
-test/                     四个测试套件，64 项
+test/                     四个测试套件，68 项
 test/fixtures/            官方定价页的真实快照，解析器测试用
 install.md                安装步骤与排查
 install/cordis.patch.yml  带注释的配置模板
@@ -157,8 +157,8 @@ MIT，见 [LICENSE](LICENSE)。
 | `preview.mjs` | **数据与判定**：倍率、峰谷、切换倒计时、节假日分类 | 终端命令；`--fetch` 会真的抓官方页面 |
 | `preview-ui.mjs` | **外观**：信息条与详情面板的排版、配色、深色模式 | 生成独立 HTML，浏览器打开；不需要安装 |
 
-界面预览页含 5 个场景：高峰 ×2、空闲 ×1、展开详情、数据过期（圆点转黄）、
-接口不可用（×?）。配色与圆角取自已安装的 `@deepseek-ai/dsh-client-ui-theme`，
+界面预览页含 7 个场景：高峰 ×2、空闲 ×1、展开详情、数据过期（圆点转黄）、
+来源混用、时段退化为代码默认、接口不可用（×?）。配色与圆角取自已安装的 `@deepseek-ai/dsh-client-ui-theme`，
 输入框几何值取自 `dsh-client-ui-conversation`（卡片 `min(calc(100% - 16px), 952px)`、
 内缩 8px）。类名映射直接从组件源码抽取 —— 改名会让预览显示异常，而不是悄悄失真。
 
