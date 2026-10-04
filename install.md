@@ -23,6 +23,10 @@ cd ~/Documents/workspace/uoftwork/dsh-custom/dsh-price-peak
 三项都应通过。`preview.mjs --fetch` 的输出里，`数据来源` 应该是
 `https://api-docs.deepseek.com/zh-cn/quick_start/pricing/`。
 
+> 第 2 项在**刚克隆下来时就应该通过**：仓库里入库的 `lib/client.js` 与 `src/` 是同步的，
+> 所以不需要先构建。它失败只有一种情况 —— 你改过 `src/` 却没重新构建，此时运行
+> `node build.mjs` 即可。`npm run verify` 会把这一检查和全部测试一起跑。
+
 ---
 
 ## 安装
