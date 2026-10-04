@@ -245,18 +245,24 @@ test("a payload without provenance still renders", async () => {
 	assert.equal(view.sources, undefined, "absent provenance must not become a rendered object");
 });
 
-test("the price formatter keeps every digit and never renders nonsense", async () => {
+test("the price formatter is digit-exact and independent of the viewer's locale", async () => {
 	const { exports } = await loadBundle();
-	// The helper used to `return String(value)` under a comment promising grouped
-	// output — an identity function with a misleading name. It formats for real now,
-	// and these are the values the official table actually produces.
-	assert.equal(exports.numberText(0.02), "0.02", "the smallest cache-hit rate survives intact");
-	assert.equal(exports.numberText(13.5), "13.5", "and a half-rate does not round");
+	assert.equal(exports.numberText(0.02), "0.02");
+	assert.equal(exports.numberText(13.5), "13.5", "a half-rate does not round");
 	assert.equal(exports.numberText(27), "27");
 	assert.equal(exports.numberText(0), "0");
 	assert.equal(exports.numberText(Number.NaN), "—");
 	assert.equal(exports.numberText(undefined), "—");
 	assert.equal(exports.numberText("4"), "—", "a string is not a price");
+
+	// The reason this is not `toLocaleString()`: its defaults round to three
+	// fraction digits (0.0005 -> "0.001", 0.00005 -> "0") and vary by locale. A
+	// price rendered as 0 is a wrong price, and a locale-dependent formatter makes
+	// this suite environment-dependent too.
+	assert.notEqual(exports.numberText(0.00005), (0.00005).toLocaleString(),
+		"the formatter must not silently round to zero the way toLocaleString can");
+	assert.equal(exports.numberText(0.00005), "0.00005", "however small, the digits survive");
+	assert.equal(exports.numberText(4032), "4032", "and no grouping separators are inserted");
 });
 
 test("a failed poll keeps the last reading instead of blanking the panel", async () => {
