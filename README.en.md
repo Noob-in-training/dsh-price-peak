@@ -88,7 +88,7 @@ cd dsh-price-peak
 
 # Preflight
 node build.mjs --check      # the committed bundle matches src/ — no build needed
-npm test                    # 77 tests
+npm test                    # 80 tests
 node preview.mjs --fetch    # fetch the live page and print the current state
 
 # Install into your DSH profile
@@ -142,11 +142,17 @@ browser. Nothing is written to disk, no telemetry, no third parties.
 - **Chinese pricing page only.** The English page uses different labels (`MODEL`,
   `PRICING`, `Beijing time`) and quotes USD, so the extractor returns nothing for it and
   the code no longer tries.
-- **Statutory holiday dates need a yearly update.** The page publishes the rule but never
-  the dates. 2026's table (33 statutory days, 6 调休 workdays) comes from
+- **The statutory holiday table covers 2026 only, and it cannot self-correct.** Once the
+  year turns, a statutory holiday falling on a weekday is reported as a peak weekday —
+  2027-01-01 is a Friday and a holiday, and would be priced at ×2. No fetch can fix this:
+  the page publishes the rule, never the dates. So the panel warns that the current date
+  is outside the table's coverage, the reading is marked stale, and you supply the year's
+  dates through `customHolidayRuns` (which takes a `year`) or `holidays`. 2026's table
+  (33 statutory days, 6 调休 workdays) comes from
   [国办发明电〔2025〕7号](https://www.gov.cn/zhengce/content/202511/content_7047090.htm).
-  Next year's notice can be entered through the config without touching code — see
-  `customHolidayRuns` in [install.md](install.md).
+- **Leap days follow the real calendar.** `2028-02-29` is accepted; `2027-02-29` and
+  `2026-02-29` are rejected. A run that overruns a short month stops at that month's last
+  day rather than spilling into the next.
 - **A page redesign will break the extractor and the tests will not notice.** The test
   fixture is a frozen snapshot with no CI to re-capture it. The earliest warning is the
   panel's own source line turning into "bundled snapshot" or "code default".
@@ -154,7 +160,7 @@ browser. Nothing is written to disk, no telemetry, no third parties.
 ## Development
 
 ```bash
-npm run verify        # build consistency + all 77 tests — run before committing
+npm run verify        # build consistency + all 80 tests — run before committing
 npm run probe:setup   # links the app's node_modules so lib/index.js is importable
 node build.mjs        # regenerate lib/client.js after editing src/
 node preview-ui.mjs --open   # visual preview of the dock, 7 scenarios

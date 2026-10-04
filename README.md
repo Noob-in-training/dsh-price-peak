@@ -25,7 +25,7 @@ English | [中文](README.md) — [README.en.md](README.en.md)
 ### 1. 价格表不是写死的，而是从官方页面解析出来的
 
 `lib/core.js`、`lib/parse.js` 里**没有任何价格数字**（只有注释里举过例子）。
-全仓库唯一写死价格的地方是 `lib/snapshot.js` —— 一个 42 行的文件，**没有**峰谷时段、
+唯一的常量价格**表**是 `lib/snapshot.js` —— 一个 42 行的文件（测试里有价格断言，夹具里有页面原文，但都不是运行时的数据源），**没有**峰谷时段、
 **没有**倍率，只在「首次运行」和「抓取失败」时兜底。其余文件里出现的 `offPeak`
 都是**字段名**（读取、折叠、渲染），不是数值。
 
@@ -150,7 +150,7 @@ lib/snapshot.js           内置兜底数据
 lib/client.js             ← 构建产物（已入库），浏览器实际加载的就是它
 src/client.template.js    浏览器半区源码（ESM，可直接 node --check）
 src/client-styles.js      样式（构建时内联进 bundle）
-test/                     四个测试套件，77 项
+test/                     四个测试套件，80 项
 test/fixtures/            官方定价页的真实快照，解析器测试用
 install.md                安装步骤与排查
 install/cordis.patch.yml  带注释的配置模板
@@ -208,6 +208,7 @@ NODE=~/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin/node
 cd ~/Documents/workspace/uoftwork/dsh-custom/dsh-price-peak
 
 npm run verify                    # 构建一致性 + 全部测试（提交前跑这个）
+npm run probe:setup               # 宿主行为测试需要它；没跑时那 4 个测试会静默跳过
 "$NODE" build.mjs                 # 改过 src/ 之后必须重新构建
 "$NODE" preview.mjs --fetch       # 联网抓取并打印当前状态（数据预览）
 "$NODE" preview.mjs --day 2026-02-14   # 打印某天逐小时的峰谷
@@ -257,7 +258,15 @@ MIT，见 [LICENSE](LICENSE)。
 
 ## 已知限制
 
-- 法定节假日日期需人工跟进（见上）。
+- **法定节假日表只覆盖 2026 年，且不会自我修正。** 到期后，落在工作日的法定节假日会被
+  算成高峰 ×2（例如 2027-01-01 是周五、是法定节假日，却会被判为工作日高峰）。这**不是**
+  刷新能解决的问题 —— 抓取只能拿到规则，拿不到日期。所以：
+  - 面板会显示警告，说明当前日期已超出内置表覆盖范围，需要你在配置里补上当年的日期；
+  - 数据同时被标记为过期（圆点转黄），因为此时判定不可信；
+  - 国务院公布 2027 年安排后，用 `customHolidayRuns`（可带 `year` 字段）或无 `year` 的
+    `holidays` 填入即可，无需改代码。
+- **闰年按真实日历处理。** `2028-02-29` 会被接受，`2027-02-29`、`2026-02-29` 会被拒绝；
+  超出一个月的假期区间会在当月最后一天停止，不会溢出到下个月。
 - 定价页若大改表格结构，解析器需要更新。**测试不会自动报警**（夹具冻结、无 CI），
   要靠你重新抓取夹具，或注意到面板的来源标注变成了「内置快照」。
 - **只支持中文定价页。** 英文页的标签不同（`MODEL`/`PRICING`/`Beijing time`），

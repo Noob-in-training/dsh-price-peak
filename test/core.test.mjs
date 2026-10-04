@@ -228,6 +228,36 @@ test("adding a holiday does not quietly disable the 调休 table by accident", (
 	assert.equal(status(bj(2026, 2, 14, 10, 0), runs).peak, false, "its 调休 entry goes with the table");
 });
 
+test("dates outside the shipped calendar year are flagged, not answered silently", () => {
+	// The holiday table is a fixed list for one year, and no fetch can extend it. By
+	// 2027 the plugin would classify 2027-01-01 (a Friday and a statutory holiday) as
+	// a peak weekday, with nothing to suggest the answer was an assumption. There is
+	// no self-correction for this, so it has to be reported.
+	assert.equal(status(bj(2026, 1, 5, 10, 0)).outsideCalendarCoverage, false, "inside coverage");
+	assert.equal(status(bj(2027, 1, 1, 10, 0)).outsideCalendarCoverage, true, "2027 is outside");
+	assert.equal(status(bj(2027, 1, 1, 10, 0)).peak, true, "and the wrong answer is still wrong");
+	assert.equal(status(bj(2028, 6, 1, 10, 0)).outsideCalendarCoverage, true);
+
+	// A user-supplied table is not year-bound in the same way, so the flag stays off.
+	assert.equal(
+		status(bj(2027, 1, 1, 10, 0), { holidays: ["2027-01-01"] }).outsideCalendarCoverage,
+		false,
+		"an explicit holiday list covers whatever year it names"
+	);
+});
+
+test("leap days are handled by the calendar, not assumed away", () => {
+	// 2026 is not a leap year, so nothing in the shipped table exercises 2/29.
+	assert.equal(buildHolidayCalendar(["2028-02-29"]).has("2028-02-29"), true, "2028 is a leap year");
+	assert.equal(buildHolidayCalendar(["2027-02-29"]).size, 0, "2027 is not");
+	assert.equal(buildHolidayCalendar(["2026-02-29"]).size, 0, "nor is 2026");
+	// And a run that overruns a short month stops at the month's end.
+	const february = buildHolidayCalendar(undefined, true, [{ year: 2026, month: 2, from: 20, to: 31 }]);
+	assert.equal(february.has("2026-02-28"), true, "the run reaches the last real day");
+	assert.equal(february.has("2026-02-29"), false, "and does not invent one");
+	assert.equal(february.has("2026-03-01"), false, "nor spill into March");
+});
+
 test("a holiday run can name its own year, so next year needs no code change", () => {
 	// CALENDAR_YEAR used to key every run, so a run meant for 2027 produced 2026
 	// keys and the documented "no code change next year" path simply did not work.

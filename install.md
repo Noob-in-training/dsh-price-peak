@@ -12,9 +12,17 @@
 
 先在插件目录里把测试和构建跑一遍。装上再排查要慢得多：
 
+先用 git 取一份代码（下面的命令都在仓库根目录里执行）：
+
+```bash
+git clone https://github.com/Noob-in-training/dsh-price-peak
+cd dsh-price-peak
+```
+
 ```bash
 NODE=~/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin/node
-cd ~/Documents/workspace/uoftwork/dsh-custom/dsh-price-peak
+# 如果你已经有本地副本，把下面这行换成你的路径
+cd dsh-price-peak
 "$NODE" --test test/core.test.mjs test/parse.test.mjs test/host.test.mjs test/client-bundle.test.mjs
 "$NODE" build.mjs --check     # lib/client.js 是否与 src/ 同步
 "$NODE" preview.mjs --fetch   # 联网抓一次官方页面，打印当前状态
@@ -98,6 +106,27 @@ cp -R "$SRC" "$TARGET"
 | `liveUpdate` | `true` | 是否联网刷新官方定价页。`false` 则只用内置快照。 |
 | `refreshMinutes` | `360` | 刷新间隔，5–10080 分钟。 |
 | `timeoutMs` | `15000` | 单次抓取超时。 |
+| `sourceUrl` | `''` | 填了则**只用**这一个地址（严格覆盖），失败就是失败。留空则用官方中文页。 |
+| `holidays` | `[]` | 额外法定节假日 `YYYY-MM-DD`，**替换**内置 2026 年表。 |
+| `customHolidayRuns` | `[]` | 额外假期区间 `{ month, from, to, name }`，同样替换内置表。 |
+| `treatAdjustedWorkdaysAsPeak` | `true` | 调休上班日是否算高峰。 |
+| `peakMultiplier` | `0` | 覆盖倍率；0 表示采用页面上的数值。 |
+| `model` | `''` | 详情面板按哪个模型计价；留空用第一行。 |
+
+### 宿主行为测试需要一次 `probe:setup`
+
+`test/host.test.mjs` 里有 4 个测试会真正调用 `apply` 并读取路由响应 —— 这是唯一覆盖
+「配置 → 抓取 → 状态文档」整条链路的测试。但 `lib/index.js` 依赖 `@deepseek-ai/schemastery`
+（App 的 peer 依赖，不是本插件的依赖），ESM 只能从**导入方所在目录向上**解析，所以直接从
+仓库里 import 会失败。跑一次：
+
+```bash
+npm run probe:setup   # 建立指向 App node_modules 的软链
+```
+
+**没跑这一步时，那 4 个测试会静默跳过并仍然显示 ✔** —— 全新克隆 `npm test` 是 77/77，
+但耗时只有几十毫秒而不是二十秒，因为探测根本没执行。这是已知的信任缺口，不是通过。
+
 ### 上游页面改版了怎么办
 
 `test/fixtures/pricing-zh-cn.html` 是**冻结**的页面快照，不会自己更新。上游改版后：
@@ -108,13 +137,6 @@ cp -R "$SRC" "$TARGET"
 
 没有 CI 会自动做这件事，所以**面板上的来源标注是最早的预警**：它变成「内置快照」
 或「代码默认」就说明解析器已经跟不上页面了。
-
-| `sourceUrl` | `''` | 填了则**只用**这一个地址（严格覆盖），失败就是失败。留空则用官方中文页。 |
-| `holidays` | `[]` | 额外法定节假日 `YYYY-MM-DD`，**替换**内置 2026 年表。 |
-| `customHolidayRuns` | `[]` | 额外假期区间 `{ month, from, to, name }`，同样替换内置表。 |
-| `treatAdjustedWorkdaysAsPeak` | `true` | 调休上班日是否算高峰。 |
-| `peakMultiplier` | `0` | 覆盖倍率；0 表示采用页面上的数值。 |
-| `model` | `''` | 详情面板按哪个模型计价；留空用第一行。 |
 
 ### 关于 `treatAdjustedWorkdaysAsPeak`
 

@@ -224,6 +224,20 @@ test("toView classifies an off-peak payload and counts down to the peak", async 
 	assert.equal(view.nextIn, "1天23小时", "a long gap reads in days, not hours");
 });
 
+test("toView carries the out-of-coverage calendar year through", async () => {
+	const { exports } = await loadBundle();
+	const view = exports.toView({
+		status: {
+			peak: true, multiplier: 2, beijing: { clock: "10:00:00" }, reason: "r",
+			msUntilTransition: 1000, outsideCalendarCoverage: true, calendarYear: 2026
+		},
+		pricing: { models: [], peakWindows: [] },
+		data: { live: true, stale: true }
+	});
+	assert.equal(view.outsideCalendarCoverage, true);
+	assert.equal(view.calendarYear, 2026, "the panel names the year the table covers");
+});
+
 test("toView carries per-field provenance through to the panel", async () => {
 	const { exports } = await loadBundle();
 	const view = exports.toView({

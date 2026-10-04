@@ -155,8 +155,10 @@ test("a configured sourceUrl is a strict override, never a silent fallback", () 
 		/return typeof config\.sourceUrl === "string" && config\.sourceUrl\.length > 0\s*\n\s*\? \[config\.sourceUrl\]\s*\n\s*: \[PRICING_URL\];/,
 		"an override must replace the URL list rather than head it"
 	);
-	assert.match(source, /usedFallback = result\.fellBack === true/, "and a fallback must be recorded");
-	assert.match(source, /usedFallbackSource: usedFallback/, "and surfaced on the wire");
+	// There is no fallback path at all now: one URL, or the override. Asserting the
+	// absence is the point — a re-added fallback would silently defeat the override.
+	assert.doesNotMatch(source, /fellBack/, "no fallback plumbing may return");
+	assert.match(source, /: \[PRICING_URL\];/, "and the default stays a single known source");
 });
 
 test("sourceUrl reaches the fetch through apply, not just through fetchPricing", async () => {

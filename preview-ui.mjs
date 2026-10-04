@@ -398,7 +398,7 @@ document.getElementById("theme").addEventListener("click", () => {
 const outFlag = process.argv.indexOf("--out");
 const target = outFlag === -1 ? join(here, "preview-ui.html") : process.argv[outFlag + 1];
 writeFileSync(target, html, "utf8");
-console.log(`preview-ui: wrote ${target} (${html.length} bytes, ${SCENARIOS.length} scenarios)`);
+console.log(`preview-ui: wrote ${target} (${Buffer.byteLength(html)} bytes, ${SCENARIOS.length} scenarios)`);
 
 if (process.argv.includes("--open")) {
 	// `open` on macOS, `xdg-open` on Linux, `start` on Windows. Failing to launch a

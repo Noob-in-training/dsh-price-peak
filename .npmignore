@@ -1,7 +1,7 @@
 # npm 包内容与仓库内容不同：仓库含测试，包不含。
-# `files`（package.json）已经在包含侧设了白名单，这里负责排除测试夹具与模板。
+# `files`（package.json）已经在包含侧设了白名单，这里负责排除测试夹具。
+# NOTICE 是有意随包发布的（第三方内容署名），所以不在此列。
 test/
-NOTICE
 *.bak
 .chrome-profile/
 preview-ui.html
