@@ -35,6 +35,11 @@
   "peerDependencies": {
     "@deepseek-ai/schemastery": ">=3"
   },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    }
+  },
   "files": [
     "cordis.patch.yml",
     "index.js",

@@ -167,6 +167,13 @@ cp -R "$SRC" "$TARGET"
 npm run probe:setup   # 建立指向 App node_modules 的软链
 ```
 
+> **为什么这个 peer 标了 `optional`**：装进 profile 时，那一份 schemastery 在
+> `~/.dsh/profiles/node_modules/`，也就是 profile 这个 pnpm 项目的**上一层**，而 pnpm 检查
+> peer 时只看项目自己的依赖树 —— 不标 optional 的话每次安装都会多打一条
+> `[WARN] Issues with peer dependencies found`，看起来像装坏了，其实宿主一直在提供它
+> （插件行的 `fiberPhase` 是 `active` 就是证据）。声明本身仍然有用：它写出了这个包
+> 真正 import 的东西，而不是靠运行时的解析巧合。
+
 **没跑这一步时，那 4 个测试会报 `skipped`，不会假装通过** —— 全新克隆 `npm test` 是
 `87 tests / 83 pass / 4 skipped`，耗时只有几十毫秒而不是二十秒；跑过 `probe:setup` 之后
 才是 `87/87`，二十秒左右。看耗时和 `skipped` 计数就知道探测有没有真的执行。
