@@ -24,11 +24,15 @@
     "./package.json": "./package.json"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web"
     }
   },
   "files": [
+    "cordis.patch.yml",
     "index.js",
     "lib/",
     "src/",

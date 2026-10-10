@@ -1,0 +1,40 @@
+# ── dsh-price-peak 组合包 patch ──────────────────────────────────────────────
+# 这是本包的「组合包层」（dsh.bundle.patch，见 package.json）。profile 在
+# dsh.profile.bundles 里选中本包时，dsh 把这一层拼在 dsh-base / dsh-web-app 之后、
+# profile 自己的 cordis.patch.yml 之前。
+#
+# 装了它就不需要再手工编辑任何 profile 文件 —— 侧栏「插件」页（或 plugin_manager
+# 工具）负责选择、启停与卸载本包，本文件负责声明它自己那一行。
+#
+# 行的地址是包名，不是路径：包由 profile 的 node_modules 提供（pnpm 安装，
+# 见 https://github.com/Noob-in-training/dsh-price-peak 的 install.md）。
+# 相对路径那种写法（'./plugins/dsh-price-peak/index.js'）只属于手工挂载，
+# 组合包层里不要用。
+
+- insert:
+    - id: price-peak
+      name: 'dsh-price-peak'
+      config:
+        # 是否联网刷新官方定价页。设为 false 则只用内置快照运行。
+        liveUpdate: true
+        # 刷新间隔（分钟）。价格变动以周计，6 小时足够。
+        refreshMinutes: 360
+        # 单次抓取超时（毫秒）。
+        timeoutMs: 15000
+        # 覆盖定价页地址。填了就【只】用这一个（指向镜像或固定副本时行为可预期，
+        # 失败也能看见）；留空则用官方中文页。解析器只认中文页的标签。
+        sourceUrl: ''
+        # 额外的法定节假日（YYYY-MM-DD），会【替换】内置的 2026 年表。
+        # 国务院公布下一年安排后，填这里即可，无需改代码。
+        holidays: []
+        # 额外的假期区间，同样替换内置表，适合整段放假：
+        # customHolidayRuns:
+        #   - { month: 1, from: 1, to: 3, name: 元旦 }
+        customHolidayRuns: []
+        # 调休上班日是否算高峰。true 遵循官方规则（只排除法定节假日），
+        # 也就是上班的周六仍然计高峰；false 则按普通周末处理。
+        treatAdjustedWorkdaysAsPeak: true
+        # 覆盖高峰倍率；0 表示采用页面上写的倍率。
+        peakMultiplier: 0
+        # 详情面板里按哪个模型计价；留空用第一行。
+        model: ''

@@ -16,6 +16,11 @@ English | [中文](README.md) — [README.en.md](README.en.md)
 需要逐条账单和余额的，去看 [j-chien/dsh-meter](https://github.com/J-Chien/dsh-meter)
 或 [TwotwoPiggy/dsh-balance](https://github.com/TwotwoPiggy/dsh-balance)。
 
+**安装**（组合包，走 dsh 自带的插件管理）：侧栏 **插件** → **添加插件**，填
+`github:Noob-in-training/dsh-price-peak` 或本地克隆的绝对路径，装完 **立即启用** ——
+启用了 HMR 的 profile 就地生效；没出现再刷新页面 / 重启 App。
+位置、升级、卸载与排查见 [install.md](install.md)。
+
 ---
 
 ## 三个可能让它值得装的点
@@ -140,7 +145,8 @@ $ node preview.mjs --at 2026-02-17T10:00
 ## 目录
 
 ```
-index.js                  包根入口（profile 按相对路径挂载用）
+index.js                  包根入口（手工挂载时按相对路径用）
+cordis.patch.yml          组合包 patch：装上本包后 dsh 据此挂出 price-peak 行
 build.mjs                 把 src/ 包成 lib/client.js
 preview.mjs               不装也能看效果；--fetch 联网抓一次
 lib/index.js              宿主半区：抓取、缓存、/price-peak/state 路由
@@ -153,7 +159,7 @@ src/client-styles.js      样式（构建时内联进 bundle）
 test/                     四个测试套件，80 项
 test/fixtures/            官方定价页的真实快照，解析器测试用
 install.md                安装步骤与排查
-install/cordis.patch.yml  带注释的配置模板
+install/cordis.patch.yml  手工挂载用的配置模板（带全部选项注释）
 ```
 
 ## 开发说明
@@ -205,7 +211,7 @@ dsh 启动时加载的是**已构建**的客户端 bundle，所以克隆下来�
 
 ```bash
 NODE=~/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin/node
-cd ~/Documents/workspace/uoftwork/dsh-custom/dsh-price-peak
+cd /path/to/dsh-price-peak          # 你自己的克隆路径
 
 npm run verify                    # 构建一致性 + 全部测试（提交前跑这个）
 npm run probe:setup               # 宿主行为测试需要它；没跑时那 4 个测试会静默跳过

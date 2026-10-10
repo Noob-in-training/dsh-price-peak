@@ -39,12 +39,53 @@ cd dsh-price-peak
 
 ## 安装
 
-以下命令会写入 `~/.dsh/`，超出当前会话的工作区写权限，因此需要你在弹出的
-授权提示里批准（或改成本机终端执行）。
+本包声明了组合包（`package.json` → `dsh.bundle.patch` → `./cordis.patch.yml`），
+所以用 DeepSeek Harness **自带的插件管理**来装：不复制文件、不手工编辑 profile 的
+`cordis.patch.yml`。启停、配置、卸载都在同一个页面里，App 升级也不会覆盖。
+
+### 方式 A：插件页 / `plugin_manager`（推荐）
+
+1. 侧栏 **插件** → **添加插件**。
+2. 填入下面之一，然后 **安装**：
+   - `github:Noob-in-training/dsh-price-peak` —— 组合包版本的仓库推到 GitHub 后用这个；
+   - `/Users/<你>/…/dsh-price-peak` —— 本地克隆的**绝对路径**（官方支持的 spec 形式）。
+3. 装完点 **立即启用**。profile 启用了 HMR 时**就地生效，不用重启**：宿主的
+   `include:price-peak` 行转为 `active`，浏览器半区同时把 `price-peak` 注册进
+   `conversation.input.dock`，输入框上方那条信息条直接出现。
+4. 若信息条没出现，先刷新页面；仍然没有就重启 App（未启用 HMR 的 profile
+   只在启动时应用 patch）。
+
+Agent 会话里等价的动作是 `plugin_manager` 工具的 `install_bundle`（`spec` 同上），
+它同样要求 `danger-full-access` 或本次调用的批准。
+
+用 GitHub spec 时，`git ls-remote` 会在 pnpm 之前先探一次仓库连通性；装的是本地路径时
+跳过这一步。本包没有 `prepare` 脚本，所以不会触发 pnpm 的构建脚本拦截。
+
+### 插件到底装在哪
+
+组合包由 profile 的 pnpm 项目持有，位置都在这几个地方 —— 排查时按这个顺序看：
+
+| 路径 | 是什么 |
+|---|---|
+| `~/.dsh/profiles/desktop/node_modules/dsh-price-peak/` | 包装在这里（pnpm 装的依赖） |
+| `~/.dsh/profiles/desktop/package.json` → `dsh.profile.bundles` | 选中了哪些组合包 |
+| `<包内>/cordis.patch.yml` | 本包声明自己那一行（组合包层） |
+| `~/.dsh/profiles/desktop/cordis.patch.yml` | profile 自己的 patch 层：插件页把你改的行开关/配置写在这里 |
+| `~/.dsh/profiles/node_modules/` | 各 profile 共享的解析根，App 自带的包在这 |
+| `~/.dsh/profiles/desktop/.plugin-manager/logs/` | 每次 pnpm 运行的完整输出 |
+| `~/.dsh/profiles/desktop/plugins/` | **不是** DSH 的概念：只有方式 B 手工挂载时才会出现 |
+
+**升级**：卸载再从插件页装一次（安装界面里也写着：装上之后暂不支持自动更新）。
+**卸载**：在插件页点卸载 —— 它先取消选择、再跑 `pnpm remove`，profile 里不会留下手写配置。
+
+### 方式 B：手工挂载（组合包机制不可用时）
+
+只有在不能用插件页（例如要挂一份没声明 `dsh.bundle` 的改版）时才走这条。下面命令写
+`~/.dsh/`，超出会话的工作区写权限，需要在授权提示里批准（或改成本机终端执行）。
 
 ```bash
 PROFILE=~/.dsh/profiles/desktop
-SRC=~/Documents/workspace/uoftwork/dsh-custom/dsh-price-peak
+SRC=/绝对路径/dsh-price-peak
 TARGET="$PROFILE/plugins/dsh-price-peak"
 
 mkdir -p "$PROFILE/plugins"
@@ -54,9 +95,6 @@ mkdir -p "$PROFILE/plugins"
 [ -n "$TARGET" ] && [ "$TARGET" != "/" ] && rm -rf "$TARGET"
 cp -R "$SRC" "$TARGET"
 ```
-
-**升级**就是重跑这几行，然后重启 App —— 这段是幂等的。配置在
-`cordis.patch.yml` 里，不在插件目录内，所以升级不会丢设置。
 
 然后编辑 `~/.dsh/profiles/desktop/cordis.patch.yml`，在**文件末尾**追加：
 
@@ -71,13 +109,15 @@ cp -R "$SRC" "$TARGET"
 
 `install/cordis.patch.yml` 里有带全部选项注释的完整版本，直接抄也可以。
 
-最后**重启 App**。客户端 bundle 是启动时扫描的，热加载不会把它带进来。
+两种方式**不要同时用**：行 id 都是 `price-peak`，同时存在会得到两个同名行。
+
+最后确认它挂上了；没出现就先刷新页面，再重启 App。
 
 ---
 
 ## 验证
 
-重启后打开一个会话，输入框上方应出现一条细信息条：
+装好后打开一个会话，输入框上方应出现一条细信息条：
 
 ```
 ×1   北京 02:52 · 国庆节假期 · 全天空闲        距高峰 3天6小时   ● 详情
@@ -92,14 +132,17 @@ cp -R "$SRC" "$TARGET"
 2. **宿主是否报错** —— 看启动它的那个终端窗口，插件加载失败会在那里打印。
 3. **客户端 bundle 是否被扫到** —— 需要 `package.json` 里同时有
    `exports["./client"]` 和 `dsh.client.platform === "web"`；本仓库两者都已具备。
-4. **相对路径是否解析对了** —— `./plugins/dsh-price-peak/index.js` 是相对 profile
-   目录解析的。若 App 报找不到模块，改用绝对路径 `/Users/<你>/.dsh/profiles/desktop/plugins/dsh-price-peak/index.js` 试一次。
+4. **行是否挂上** —— 插件页里 `dsh-price-peak` 卡片的 `price-peak` 行应显示为运行中
+   （Host fiber 阶段 `active`）。报找不到模块时，先确认 `~/.dsh/profiles/desktop/package.json`
+   的 `dependencies` 里有 `dsh-price-peak`，且它出现在 `dsh.profile.bundles` 里；
+   方式 B 的 `./plugins/…` 路径是相对 profile 目录解析的，可与包名区分开。
 
 ---
 
 ## 配置项
 
-改 `cordis.patch.yml` 里的 `config` 后重启生效。
+改插件页里本包的 `config`（它写的就是 profile 的 `cordis.patch.yml`）。启用 HMR 时
+改动即刻生效，否则重启后生效。
 
 | 键 | 默认 | 说明 |
 |---|---|---|
@@ -177,6 +220,10 @@ npm run probe:setup   # 建立指向 App node_modules 的软链
 ---
 
 ## 卸载
+
+方式 A：插件页里点该组合包的**卸载** —— 取消选择、跑 `pnpm remove`，配置随包一起走。
+
+方式 B（手工挂载）才需要手工清理：
 
 ```bash
 rm -rf ~/.dsh/profiles/desktop/plugins/dsh-price-peak

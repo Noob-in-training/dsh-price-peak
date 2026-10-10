@@ -82,34 +82,32 @@ dot amber, and records the reason in the expanded view.
 
 ## Install
 
-```bash
-git clone https://github.com/Noob-in-training/dsh-price-peak
-cd dsh-price-peak
+This package declares a bundle (`package.json` → `dsh.bundle.patch` → `./cordis.patch.yml`),
+so install it with DSH's own plugin manager: no file copying, no hand-editing the profile's
+`cordis.patch.yml`.
 
-# Preflight
-node build.mjs --check      # the committed bundle matches src/ — no build needed
+1. Sidebar **Plugins** → **Add plugin**.
+2. Enter `github:Noob-in-training/dsh-price-peak`, or the absolute path of your local clone.
+3. **Install**, then **Enable now**. On a profile with HMR (the desktop profile has it) the
+   bundle applies in place: the host's `include:price-peak` row turns `active` and the browser
+   half registers `price-peak` into `conversation.input.dock` — no restart.
+4. If the bar does not appear, refresh the page first; restart the App only if it still does not
+   (a profile without HMR applies patches at startup only).
+
+```bash
+# Preflight, from a clone (the committed bundle matches src/, so no build is needed)
+node build.mjs --check      # artifact/source agreement
 npm test                    # 80 tests
 node preview.mjs --fetch    # fetch the live page and print the current state
-
-# Install into your DSH profile
-PROFILE=~/.dsh/profiles/desktop
-TARGET="$PROFILE/plugins/dsh-price-peak"
-[ -n "$TARGET" ] && [ "$TARGET" != "/" ] && rm -rf "$TARGET"
-cp -R "$PWD" "$TARGET"
 ```
 
-Then append this to `~/.dsh/profiles/desktop/cordis.patch.yml`:
+Where it lands: `~/.dsh/profiles/desktop/node_modules/dsh-price-peak/`, selected in
+`~/.dsh/profiles/desktop/package.json` under `dsh.profile.bundles`; any config you edit
+through the Plugins page is written to `~/.dsh/profiles/desktop/cordis.patch.yml`.
+Uninstall from the same page.
 
-```yaml
-- insert:
-    - id: price-peak
-      name: './plugins/dsh-price-peak/index.js'
-      config:
-        liveUpdate: true
-        refreshMinutes: 360
-```
-
-Restart the App. Client bundles are scanned at startup, so a reload is not enough.
+Mounting the package by relative path (`~/.dsh/profiles/desktop/plugins/…` plus a manual
+`insert` in the profile patch) still works but is the fallback path, not the managed one.
 
 Full walkthrough, configuration table, and troubleshooting: [install.md](install.md)
 (Chinese).
