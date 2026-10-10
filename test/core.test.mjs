@@ -228,6 +228,28 @@ test("adding a holiday does not quietly disable the 调休 table by accident", (
 	assert.equal(status(bj(2026, 2, 14, 10, 0), runs).peak, false, "its 调休 entry goes with the table");
 });
 
+test("either holiday form reports the shipped table as replaced", () => {
+	// `usingShippedHolidays` answered on `holidays` alone, so a customHolidayRuns-only
+	// config was reported as still using the shipped table while `buildHolidayCalendar`
+	// had already replaced it — the status document then disagreed with itself, since
+	// `outsideCalendarCoverage` tested both forms. Both fields must agree: the shipped
+	// table is in use only when NEITHER override was supplied.
+	const atChristmas = bj(2026, 12, 25, 10, 0);
+	assert.equal(status(atChristmas).usingShippedHolidays, true, "nothing configured");
+	assert.equal(status(atChristmas, { holidays: ["2026-12-25"] }).usingShippedHolidays, false);
+	assert.equal(
+		status(atChristmas, { customHolidayRuns: [{ month: 12, from: 25, to: 26, name: "圣诞" }] }).usingShippedHolidays,
+		false,
+		"a custom run list replaces the shipped table just as a date list does"
+	);
+
+	// And the pair stays consistent with the other field derived from the same test.
+	const runs = { customHolidayRuns: [{ year: 2027, month: 1, from: 1, to: 3, name: "元旦" }] };
+	const custom = status(bj(2027, 1, 1, 10, 0), runs);
+	assert.equal(custom.usingShippedHolidays, false);
+	assert.equal(custom.outsideCalendarCoverage, false, "a supplied table is not year-bound");
+});
+
 test("dates outside the shipped calendar year are flagged, not answered silently", () => {
 	// The holiday table is a fixed list for one year, and no fetch can extend it. By
 	// 2027 the plugin would classify 2027-01-01 (a Friday and a statutory holiday) as
@@ -578,6 +600,17 @@ test("formatDuration covers seconds, minutes, hours, and days", () => {
 	assert.equal(formatDuration(7380000), "2小时03分");
 	assert.equal(formatDuration(829320000), "9天14小时", "a long holiday gap reads in days");
 	assert.equal(formatDuration(-5000), "0秒");
+});
+
+test("formatDuration reports an unknown duration instead of formatting one", () => {
+	// `pricingStatus` returns `null` for a transition beyond its search horizon, and
+	// the value is exported as a service. `Math.max(0, Math.floor(null / 1000))` is
+	// `0`, so this used to answer a confident "0秒" for a countdown that does not
+	// exist; `undefined` produced the literal string "NaN秒".
+	assert.equal(formatDuration(null), "未知");
+	assert.equal(formatDuration(undefined), "未知");
+	assert.equal(formatDuration(Number.NaN), "未知");
+	assert.equal(formatDuration(Number.POSITIVE_INFINITY), "未知");
 });
 
 test("multiplierText renders the badge", () => {

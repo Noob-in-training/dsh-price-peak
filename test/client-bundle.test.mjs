@@ -310,3 +310,144 @@ test("a malformed payload is treated as no payload", async () => {
 		assert.equal(view.ok, false, `${JSON.stringify(payload)} must not read as usable`);
 	}
 });
+
+// ── The unknown-transition contract ──────────────────────────────────────────
+// The host returns `msUntilTransition: null` when no transition exists inside its
+// 14-day search horizon, and says in `core.js` that callers must not invent a
+// duration for it. `null ?? 0` used to reach the formatter, which rendered the
+// countdown to nothing the null was there to prevent.
+
+test("toView keeps an unknown transition unknown", async () => {
+	const { exports } = await loadBundle();
+	const payload = {
+		status: {
+			peak: false,
+			multiplier: 1,
+			beijing: { clock: "10:00:00" },
+			reason: "长假假期",
+			windowLabel: "全天空闲",
+			msUntilTransition: null,
+			windows: []
+		},
+		pricing: { models: [], peakWindows: [] },
+		data: { live: true, stale: false }
+	};
+	assert.equal(exports.toView(payload, undefined, undefined).nextIn, null, "null must not become 0秒");
+
+	// A real duration still renders, and a missing field is the same as unknown.
+	payload.status.msUntilTransition = 5400000;
+	assert.equal(exports.toView(payload, undefined, undefined).nextIn, "1小时30分");
+	delete payload.status.msUntilTransition;
+	assert.equal(exports.toView(payload, undefined, undefined).nextIn, null);
+});
+
+/**
+ * Every string a tree would render, in document order.
+ *
+ * Function-typed elements are invoked the way React would, because the panel builds
+ * its rows as `<Row label=… value=…>` elements — the text lives in the output of the
+ * component, not in the element's children.
+ */
+function textOf(node) {
+	if (node === null || node === undefined || typeof node === "boolean") return [];
+	if (typeof node === "string" || typeof node === "number") return [String(node)];
+	if (Array.isArray(node)) return node.flatMap(textOf);
+	if (typeof node.type === "function") return textOf(node.type(node.props));
+	return textOf(node.children);
+}
+
+/**
+ * Render the dock with its detail panel open, against one fixed view.
+ *
+ * The component asks `useState` twice — `open` first, then the polled view — so the
+ * substitute React answers `true` to the first call and the supplied view to the
+ * rest. `registration.factory` is invoked again instead of reusing the cached
+ * exports: the bundle captures its React when the factory runs, and each instance
+ * needs its own hooks. `useEffect` is inert, so nothing polls.
+ */
+async function renderExpanded(view) {
+	const { registration } = await loadBundle();
+	installDom();
+	let call = 0;
+	const react = {
+		createElement: (type, props, ...children) => ({ type, props, children }),
+		useState: () => (call++ === 0 ? [true, () => {}] : [view, () => {}]),
+		useEffect: () => {}
+	};
+	const exports = registration.factory((specifier) => {
+		if (specifier === "react") return react;
+		throw new Error(`unexpected require(${specifier})`);
+	});
+	const registered = [];
+	exports.apply({
+		effect: (fn) => { fn(); return () => {}; },
+		slots: {
+			inject: (_key, callback) => callback(),
+			register: (options, component) => registered.push({ options, component })
+		}
+	});
+	return textOf(registered[0].component({}));
+}
+
+test("the panel shows no countdown when the transition is unknown", async () => {
+	const { exports } = await loadBundle();
+	const base = {
+		status: {
+			peak: false,
+			multiplier: 1,
+			dateKey: "2026-04-15",
+			beijing: { clock: "10:00:00" },
+			reason: "长假假期",
+			windowLabel: "全天空闲",
+			msUntilTransition: null,
+			windows: []
+		},
+		pricing: { models: [], peakWindows: [{ startHour: 9, endHour: 12 }] },
+		data: { live: true, stale: false, ageMs: 1000, refreshMinutes: 360 }
+	};
+	const unknown = await renderExpanded(exports.toView(base, undefined, undefined));
+	assert.equal(unknown.some((text) => text.includes("0秒")), false, "no invented countdown");
+	// The bar renders "距高峰 <duration>"; the panel's row label is "距高峰（×2）", so
+	// the space is what distinguishes "the bar showed a countdown" from "the panel
+	// named the row".
+	assert.equal(unknown.some((text) => text.includes("距高峰 ")), false, "the bar omits the countdown");
+	assert.equal(unknown.some((text) => text.includes("未知（超出搜索范围）")), true, "the panel says why");
+
+	base.status.msUntilTransition = 5400000;
+	const known = await renderExpanded(exports.toView(base, undefined, undefined));
+	assert.equal(known.some((text) => text.includes("距高峰 1小时30分")), true, "a real duration still renders");
+	assert.equal(known.some((text) => text.includes("未知（超出搜索范围）")), false, "and nothing claims to be unknown");
+});
+
+test("snapshot-only mode does not claim a fetch happened", async () => {
+	const { exports } = await loadBundle();
+	// What the host actually sends with `liveUpdate: false`: no `fetchedAt`, no
+	// `lastError`, and `stale: true` because the snapshot is old. The amber dot is
+	// honest there; "显示的是最后一次成功抓取的结果" is not — nothing was fetched.
+	const payload = {
+		status: {
+			peak: true,
+			multiplier: 2,
+			dateKey: "2026-04-15",
+			beijing: { clock: "10:00:00" },
+			reason: "工作日高峰时段",
+			windowLabel: "上午高峰",
+			msUntilTransition: 5400000,
+			windows: []
+		},
+		pricing: { models: [], peakWindows: [], sources: { models: "snapshot", windows: "default", multiplier: "default" } },
+		data: { live: false, stale: true, liveUpdateEnabled: false, snapshotOnly: true, refreshMinutes: 360 }
+	};
+	const texts = await renderExpanded(exports.toView(payload, undefined, undefined));
+	assert.equal(texts.some((t) => t.includes("联网刷新已关闭")), true, "it names the real reason");
+	assert.equal(
+		texts.some((t) => t.includes("显示的是最后一次成功抓取的结果")),
+		false,
+		"and never claims a fetch that did not happen"
+	);
+
+	// The networked case keeps the original wording: there, a fetch really did fail.
+	payload.data = { live: true, stale: true, ageMs: 90 * 60 * 1000, refreshMinutes: 360 };
+	const online = await renderExpanded(exports.toView(payload, undefined, undefined));
+	assert.equal(online.some((t) => t.includes("显示的是最后一次成功抓取的结果")), true);
+});

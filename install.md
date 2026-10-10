@@ -159,16 +159,22 @@ cp -R "$SRC" "$TARGET"
 ### 宿主行为测试需要一次 `probe:setup`
 
 `test/host.test.mjs` 里有 4 个测试会真正调用 `apply` 并读取路由响应 —— 这是唯一覆盖
-「配置 → 抓取 → 状态文档」整条链路的测试。但 `lib/index.js` 依赖 `@deepseek-ai/schemastery`
-（App 的 peer 依赖，不是本插件的依赖），ESM 只能从**导入方所在目录向上**解析，所以直接从
-仓库里 import 会失败。跑一次：
+「配置 → 抓取 → 状态文档」整条链路的测试。但 `lib/index.js` 依赖 `@deepseek-ai/schemastery`：
+它在 `package.json` 里声明为 **peerDependency**（由宿主供给，插件不自己装一份），而本仓库
+不装依赖，ESM 只能从**导入方所在目录向上**解析，所以直接从仓库里 import 会失败。跑一次：
 
 ```bash
 npm run probe:setup   # 建立指向 App node_modules 的软链
 ```
 
-**没跑这一步时，那 4 个测试会静默跳过并仍然显示 ✔** —— 全新克隆 `npm test` 是 77/77，
-但耗时只有几十毫秒而不是二十秒，因为探测根本没执行。这是已知的信任缺口，不是通过。
+**没跑这一步时，那 4 个测试会报 `skipped`，不会假装通过** —— 全新克隆 `npm test` 是
+`87 tests / 83 pass / 4 skipped`，耗时只有几十毫秒而不是二十秒；跑过 `probe:setup` 之后
+才是 `87/87`，二十秒左右。看耗时和 `skipped` 计数就知道探测有没有真的执行。
+
+软链是仓库里的本地开发设施（已被 `.gitignore` 忽略）。**注意：任何对 `link:` 形式的
+本包执行 pnpm 操作（例如按旧文档把它 `pnpm add link:` 进 profile）都会把目标目录的
+`node_modules` 一起清掉** —— 这正是推荐用组合包（GitHub spec）而不是本地路径安装的原因之一。
+被清掉后重跑一次 `npm run probe:setup` 即可。
 
 ### 上游页面改版了怎么办
 

@@ -96,7 +96,14 @@ function toView(payload, error, previous) {
 		windowLabel: status.windowLabel ?? "",
 		nextPeak,
 		nextLabel: nextPeak ? "距高峰" : "距空闲",
-		nextIn: durationText(status.msUntilTransition ?? 0),
+		// null means the host found no transition inside its search horizon (a holiday
+		// run longer than the 14 days it looks ahead). Formatting that as `0秒` would
+		// render a countdown to nothing, which is the one thing the host returns null
+		// to avoid — so the absence travels through as an absence, and the bar omits
+		// the countdown rather than inventing one.
+		nextIn: typeof status.msUntilTransition === "number" && Number.isFinite(status.msUntilTransition)
+			? durationText(status.msUntilTransition)
+			: null,
 		windows: Array.isArray(status.windows) ? status.windows : [],
 		model: status.model,
 		models: Array.isArray(pricing.models) ? pricing.models : [],
@@ -239,14 +246,16 @@ function register(ctx, React) {
 			? `状态接口不可用：${view.error}`
 			: view.lastError !== undefined && view.lastError !== null
 				? `抓取失败，数据可能已过期：${view.lastError}`
-				: view.stale ? "数据可能已过期" : "数据已同步";
+				: view.stale
+					? (view.liveUpdateEnabled === false ? "联网刷新已关闭，仅使用内置快照" : "数据可能已过期")
+					: "数据已同步";
 
 		const bar = React.createElement("div", { className: c.bar },
 			React.createElement("span", { className: `${c.badge} ${toneClass}` }, view.badge),
 			React.createElement("span", { className: c.clock, title: "北京时间" }, `北京 ${view.clock}`),
 			React.createElement("span", { className: c.reason },
 				view.ok ? `${view.reason}${view.windowLabel.length > 0 ? ` · ${view.windowLabel}` : ""}` : "价格状态不可用"),
-			view.ok ? React.createElement("span", { className: c.next }, `${view.nextLabel} ${view.nextIn}`) : null,
+			view.ok && view.nextIn !== null ? React.createElement("span", { className: c.next }, `${view.nextLabel} ${view.nextIn}`) : null,
 			React.createElement("span", { className: dotClass, title: dotTitle }),
 			React.createElement("button", {
 				type: "button",
@@ -266,7 +275,11 @@ function register(ctx, React) {
 				value: `${view.badge}　${view.peak ? "高峰时段" : "空闲时段"}`
 			}),
 			React.createElement(Row, { key: "bj", label: "北京时间", value: `${view.clock}（${view.dateKey}）` }),
-			React.createElement(Row, { key: "next", label: `${view.nextLabel}（${view.nextPeak ? "×2" : "×1"}）`, value: view.nextIn }),
+			React.createElement(Row, {
+				key: "next",
+				label: `${view.nextLabel}（${view.nextPeak ? "×2" : "×1"}）`,
+				value: view.nextIn ?? "未知（超出搜索范围）"
+			}),
 			React.createElement(Row, {
 				key: "win",
 				label: "高峰时段",
@@ -324,7 +337,13 @@ function register(ctx, React) {
 		if (view.lastError !== undefined && view.lastError !== null) {
 			notices.push(React.createElement("div", { className: `${c.rule} ${c.err}`, key: "fetch" }, `抓取失败：${view.lastError}`));
 		} else if (view.stale) {
-			notices.push(React.createElement("div", { className: `${c.rule} ${c.warn}`, key: "stale" }, "数据可能已过期，显示的是最后一次成功抓取的结果。"));
+			// Two different reasons wear the same amber dot. The snapshot-only one must
+			// not claim a fetch happened — with live update off there has never been one,
+			// so "显示的是最后一次成功抓取的结果" would be plainly false.
+			notices.push(React.createElement("div", { className: `${c.rule} ${c.warn}`, key: "stale" },
+				view.liveUpdateEnabled === false
+					? "联网刷新已关闭，显示的是内置快照；官方调价不会自动反映。"
+					: "数据可能已过期，显示的是最后一次成功抓取的结果。"));
 		}
 		// Mixed provenance is exactly what a partial parse produces: prices from the
 		// snapshot, schedule from the page. Say it instead of presenting one source.

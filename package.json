@@ -21,6 +21,7 @@
     "./client": {
       "default": "./lib/client.js"
     },
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "dsh": {
@@ -30,6 +31,9 @@
     "client": {
       "platform": "web"
     }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": ">=3"
   },
   "files": [
     "cordis.patch.yml",

@@ -97,7 +97,7 @@ so install it with DSH's own plugin manager: no file copying, no hand-editing th
 ```bash
 # Preflight, from a clone (the committed bundle matches src/, so no build is needed)
 node build.mjs --check      # artifact/source agreement
-npm test                    # 80 tests
+npm test                    # 87 tests (4 of them skip until `npm run probe:setup`)
 node preview.mjs --fetch    # fetch the live page and print the current state
 ```
 
@@ -158,7 +158,7 @@ browser. Nothing is written to disk, no telemetry, no third parties.
 ## Development
 
 ```bash
-npm run verify        # build consistency + all 80 tests — run before committing
+npm run verify        # build consistency + all 87 tests — run before committing
 npm run probe:setup   # links the app's node_modules so lib/index.js is importable
 node build.mjs        # regenerate lib/client.js after editing src/
 node preview-ui.mjs --open   # visual preview of the dock, 7 scenarios

@@ -16,7 +16,6 @@
 import { strict as assert } from "node:assert";
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -43,6 +42,17 @@ test("the host half declares the services its route needs", () => {
 	assert.match(source, /const name = "price-peak"/);
 	assert.match(source, /const STATE_PATH = "\/price-peak\/state"/);
 	assert.match(source, /ctx\.webServer\.register\(\{/);
+});
+
+test("the plugin names itself with the version it ships", () => {
+	// The user agent is the one place the package version is written a second time,
+	// and nothing rewrites it at build or release time — so a version bump would
+	// leave the plugin claiming the old one to the docs site. The named constant
+	// exists to make that checkable.
+	const manifest = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
+	const match = /const USER_AGENT = "([^"]+)"/.exec(readFileSync(hostPath, "utf8"));
+	assert.notEqual(match, null, "the user agent must be a named constant");
+	assert.equal(match[1], `${manifest.name}/${manifest.version}`);
 });
 
 test("the snapshot parses and resolves without a live document", () => {
@@ -161,7 +171,7 @@ test("a configured sourceUrl is a strict override, never a silent fallback", () 
 	assert.match(source, /: \[PRICING_URL\];/, "and the default stays a single known source");
 });
 
-test("sourceUrl reaches the fetch through apply, not just through fetchPricing", async () => {
+test("sourceUrl reaches the fetch through apply, not just through fetchPricing", async (t) => {
 	// This test exists because the earlier version of it called `fetchPricing`
 	// directly with a hand-built config. That passed while the plugin's real path
 	// was broken: `apply` projected its own `settings` object and never copied
@@ -169,7 +179,9 @@ test("sourceUrl reaches the fetch through apply, not just through fetchPricing",
 	// official page instead. Testing the internals instead of the entry point hid
 	// a bug in the entry point, so this drives `apply` and reads the route.
 	const probe = join(here, "..", ".probe", "host-probe.mjs");
-	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) return; // run `npm run probe:setup`
+	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) {
+		return t.skip("needs a resolving node_modules; run `npm run probe:setup`");
+	}
 
 	const run = (request) => {
 		const result = spawnSync(nodeBin, [probe, JSON.stringify(request)], { encoding: "utf8", timeout: 40000 });
@@ -194,9 +206,11 @@ test("sourceUrl reaches the fetch through apply, not just through fetchPricing",
 	assert.equal(normal.states[0].body.pricing.sources.models, "live");
 });
 
-test("a failing refresh marks the data stale immediately, not after 15 hours", async () => {
+test("a failing refresh marks the data stale immediately, not after 15 hours", async (t) => {
 	const probe = join(here, "..", ".probe", "host-probe.mjs");
-	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) return;
+	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) {
+		return t.skip("needs a resolving node_modules; run `npm run probe:setup`");
+	}
 
 	const result = spawnSync(nodeBin, [probe, JSON.stringify({
 		sourceUrl: "https://pricing.invalid.example/nope", timeoutMs: 3000, waitMs: 6000
@@ -209,9 +223,11 @@ test("a failing refresh marks the data stale immediately, not after 15 hours", a
 	assert.ok(data.lastError !== undefined && data.lastError !== null, "and the reason is recorded");
 });
 
-test("the state route answers with the documented wire shape", async () => {
+test("the state route answers with the documented wire shape", async (t) => {
 	const probe = join(here, "..", ".probe", "host-probe.mjs");
-	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) return;
+	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) {
+		return t.skip("needs a resolving node_modules; run `npm run probe:setup`");
+	}
 
 	const result = spawnSync(nodeBin, [probe, JSON.stringify({ liveUpdate: false, waitMs: 200 })], {
 		encoding: "utf8", timeout: 40000
@@ -235,12 +251,14 @@ test("the state route answers with the documented wire shape", async () => {
 	assert.equal(body.data.live, false);
 });
 
-test("an unknown next transition is reported as unknown, not fabricated", async () => {
+test("an unknown next transition is reported as unknown, not fabricated", async (t) => {
 	// A holiday run longer than the 14-day horizon used to yield an invented
 	// instant where the peak flag does not change, so the countdown pointed at a
 	// moment when nothing happens.
 	const probe = join(here, "..", ".probe", "host-probe.mjs");
-	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) return;
+	if (!existsSync(probe) || !existsSync(join(here, "..", "node_modules"))) {
+		return t.skip("needs a resolving node_modules; run `npm run probe:setup`");
+	}
 
 	const result = spawnSync(nodeBin, [probe, JSON.stringify({
 		liveUpdate: false, waitMs: 200, customHolidayRuns: [{ month: 4, from: 1, to: 30, name: "长假" }]

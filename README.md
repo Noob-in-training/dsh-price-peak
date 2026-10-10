@@ -156,7 +156,7 @@ lib/snapshot.js           内置兜底数据
 lib/client.js             ← 构建产物（已入库），浏览器实际加载的就是它
 src/client.template.js    浏览器半区源码（ESM，可直接 node --check）
 src/client-styles.js      样式（构建时内联进 bundle）
-test/                     四个测试套件，80 项
+test/                     四个测试套件，87 项
 test/fixtures/            官方定价页的真实快照，解析器测试用
 install.md                安装步骤与排查
 install/cordis.patch.yml  手工挂载用的配置模板（带全部选项注释）
@@ -214,7 +214,7 @@ NODE=~/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin/node
 cd /path/to/dsh-price-peak          # 你自己的克隆路径
 
 npm run verify                    # 构建一致性 + 全部测试（提交前跑这个）
-npm run probe:setup               # 宿主行为测试需要它；没跑时那 4 个测试会静默跳过
+npm run probe:setup               # 宿主行为测试需要它；没跑时那 4 个测试报 skipped，不假装通过
 "$NODE" build.mjs                 # 改过 src/ 之后必须重新构建
 "$NODE" preview.mjs --fetch       # 联网抓取并打印当前状态（数据预览）
 "$NODE" preview.mjs --day 2026-02-14   # 打印某天逐小时的峰谷

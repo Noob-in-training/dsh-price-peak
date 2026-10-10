@@ -66,7 +66,12 @@ async function loadPricing(wantFetch) {
 function line(epochMs, pricing) {
 	const s = pricingStatus(epochMs, pricing);
 	const badge = `×${s.multiplier}`;
-	const next = `→ ×${s.peak ? 1 : 2} in ${formatDuration(s.msUntilTransition)}`;
+	// A null transition is "unknown", not "immediately": the search horizon is 14 days
+	// and a longer holiday run leaves nothing to point at. Formatting null would print
+	// "in 0秒" — the invented countdown the host returns null to prevent.
+	const next = s.msUntilTransition === null
+		? "→ 切换点未知（超出搜索范围）"
+		: `→ ×${s.peak ? 1 : 2} in ${formatDuration(s.msUntilTransition)}`;
 	const holiday = s.holidayName === undefined ? "" : ` [${s.holidayName}]`;
 	return `  ${s.dateKey} ${s.beijing.clock.slice(0, 5)}  ${badge.padEnd(3)} ${s.peak ? "高峰" : "空闲"}  ${s.reason.padEnd(9)}${holiday.padEnd(6)} ${next}`;
 }

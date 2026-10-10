@@ -133,3 +133,36 @@ test("a refused multiplier is dropped instead of inverting the display", () => {
 	assert.equal(doc.peakMultiplier, 0.5);
 	assert.equal(parseAndValidate(html, { sourceUrl: "synthetic" }), undefined);
 });
+
+test("an ambiguous table is refused and says why", () => {
+	// The same metric twice means the table no longer has the shape this parser
+	// assumes. The document is dropped, and the reason is handed to the caller so the
+	// panel can say "the page changed shape" rather than "nothing usable found" — the
+	// reason used to be written onto the document that was then thrown away.
+	//
+	// The page carries a schedule note on purpose: `parsePricingPage` reports nothing
+	// at all for a page that yields no prices AND no schedule, so an ambiguity is only
+	// observable on a page that would otherwise have parsed.
+	const html = `<p>北京时间周一至周五（不含中国法定节假日）9:00 - 12:00、14:00 - 18:00 为高峰时段。空闲时段价格为高峰时段价格的一半。</p>
+	<table>
+		<tr><td>模型</td><td>deepseek-flash</td><td>deepseek-v4-pro</td></tr>
+		<tr><td>价格</td><td>百万tokens输出</td><td>空闲时段</td><td>4元</td><td>13.5元</td></tr>
+		<tr><td>高峰时段</td><td>8元</td><td>27.0元</td></tr>
+		<tr><td>百万tokens输出</td><td>空闲时段</td><td>5元</td><td>14元</td></tr>
+		<tr><td>高峰时段</td><td>9元</td><td>28.0元</td></tr>
+		<tr><td>并发限制</td><td>2500</td><td>500</td></tr>
+	</table>`;
+	const reasons = [];
+	assert.equal(parseAndValidate(html, { sourceUrl: "synthetic", onReject: (why) => reasons.push(why) }), undefined);
+	assert.equal(reasons.length, 1, "exactly one refusal, one reason");
+	assert.match(reasons[0], /ambiguous price rows/);
+	assert.match(reasons[0], /output/, "and it names the metric that repeated");
+
+	// A page with nothing to say is not a "refusal": there is no reason to report.
+	const silent = [];
+	assert.equal(parseAndValidate("<p>hello</p>", { onReject: (why) => silent.push(why) }), undefined);
+	assert.deepEqual(silent, [], "an unrelated page states no reason");
+
+	// A caller that passes no callback is unaffected.
+	assert.equal(parseAndValidate(html, { sourceUrl: "synthetic" }), undefined);
+});
