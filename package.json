@@ -64,7 +64,8 @@
     "preview": "node preview.mjs",
     "preview:ui": "node preview-ui.mjs --open",
     "verify": "npm run check:build && npm test",
-    "probe:setup": "ln -sfn \"$HOME/.dsh/profiles/node_modules\" node_modules"
+    "probe:setup": "ln -sfn \"$HOME/.dsh/profiles/node_modules\" node_modules",
+    "version": "node scripts/sync-version.mjs && git add lib/index.js"
   },
   "repository": {
     "type": "git",
