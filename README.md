@@ -17,8 +17,9 @@ English | [中文](README.md) — [README.en.md](README.en.md)
 或 [TwotwoPiggy/dsh-balance](https://github.com/TwotwoPiggy/dsh-balance)。
 
 **安装**（组合包，走 dsh 自带的插件管理）：侧栏 **插件** → **添加插件**，填
-`github:Noob-in-training/dsh-price-peak` 或本地克隆的绝对路径，装完 **立即启用** ——
-启用了 HMR 的 profile 就地生效；没出现再刷新页面 / 重启 App。
+`dsh-price-peak`（已发布到 npm 官方源，国内查不到时会回落到 npmmirror 镜像），
+装完 **立即启用** —— 启用了 HMR 的 profile 就地生效；没出现再刷新页面 / 重启 App。
+也可以填 `github:Noob-in-training/dsh-price-peak` 或本地克隆的绝对路径。
 位置、升级、卸载与排查见 [install.md](install.md)。
 
 ---

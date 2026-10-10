@@ -47,7 +47,8 @@ cd dsh-price-peak
 
 1. 侧栏 **插件** → **添加插件**。
 2. 填入下面之一，然后 **安装**：
-   - `github:Noob-in-training/dsh-price-peak` —— 组合包版本的仓库推到 GitHub 后用这个；
+   - `dsh-price-peak` —— npm 官方源上的已发布版本（推荐；查不到时会下一个问 npmmirror 镜像）；
+   - `github:Noob-in-training/dsh-price-peak` —— 直接从仓库装；
    - `/Users/<你>/…/dsh-price-peak` —— 本地克隆的**绝对路径**（官方支持的 spec 形式）。
 3. 装完点 **立即启用**。profile 启用了 HMR 时**就地生效，不用重启**：宿主的
    `include:price-peak` 行转为 `active`，浏览器半区同时把 `price-peak` 注册进
@@ -58,8 +59,9 @@ cd dsh-price-peak
 Agent 会话里等价的动作是 `plugin_manager` 工具的 `install_bundle`（`spec` 同上），
 它同样要求 `danger-full-access` 或本次调用的批准。
 
-用 GitHub spec 时，`git ls-remote` 会在 pnpm 之前先探一次仓库连通性；装的是本地路径时
-跳过这一步。本包没有 `prepare` 脚本，所以不会触发 pnpm 的构建脚本拦截。
+用包名时先问 registry（`pnpm view`）再 `pnpm add` 下载 tarball；用 GitHub spec 时
+`git ls-remote` 会在 pnpm 之前先探一次仓库连通性；装本地路径时这两步都跳过。
+本包没有 `prepare` 脚本，所以不会触发 pnpm 的构建脚本拦截。
 
 ### 插件到底装在哪
 
@@ -76,6 +78,8 @@ Agent 会话里等价的动作是 `plugin_manager` 工具的 `install_bundle`（
 | `~/.dsh/profiles/desktop/plugins/` | **不是** DSH 的概念：只有方式 B 手工挂载时才会出现 |
 
 **升级**：卸载再从插件页装一次（安装界面里也写着：装上之后暂不支持自动更新）。
+发新版分渠道：npm 渠道 `npm version patch && npm publish`；GitHub spec 渠道推 commit 即可 ——
+两条路取的是同一份代码，只是取件方式不同。
 **卸载**：在插件页点卸载 —— 它先取消选择、再跑 `pnpm remove`，profile 里不会留下手写配置。
 
 ### 方式 B：手工挂载（组合包机制不可用时）
@@ -180,7 +184,7 @@ npm run probe:setup   # 建立指向 App node_modules 的软链
 
 软链是仓库里的本地开发设施（已被 `.gitignore` 忽略）。**注意：任何对 `link:` 形式的
 本包执行 pnpm 操作（例如按旧文档把它 `pnpm add link:` 进 profile）都会把目标目录的
-`node_modules` 一起清掉** —— 这正是推荐用组合包（GitHub spec）而不是本地路径安装的原因之一。
+`node_modules` 一起清掉** —— 这正是推荐用组合包（npm 包名或 GitHub spec）而不是本地路径安装的原因之一。
 被清掉后重跑一次 `npm run probe:setup` 即可。
 
 ### 上游页面改版了怎么办

@@ -87,7 +87,8 @@ so install it with DSH's own plugin manager: no file copying, no hand-editing th
 `cordis.patch.yml`.
 
 1. Sidebar **Plugins** → **Add plugin**.
-2. Enter `github:Noob-in-training/dsh-price-peak`, or the absolute path of your local clone.
+2. Enter `dsh-price-peak` (published on the npm registry, with the mainland China mirror as
+   fallback), `github:Noob-in-training/dsh-price-peak`, or the absolute path of your local clone.
 3. **Install**, then **Enable now**. On a profile with HMR (the desktop profile has it) the
    bundle applies in place: the host's `include:price-peak` row turns `active` and the browser
    half registers `price-peak` into `conversation.input.dock` — no restart.
